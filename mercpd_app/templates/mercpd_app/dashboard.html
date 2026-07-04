@@ -5,39 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MERC-PD | Dashboard de Monitoreo</title>
     <link rel="stylesheet" href="/static/css/styles.css">
-    <style>
-        /* Estilos específicos para el semáforo de riesgo */
-        .card-riesgo {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .semaforo {
-            font-weight: bold;
-            padding: 10px 15px;
-            border-radius: 5px;
-            color: white;
-            text-transform: uppercase;
-        }
-        .bg-verde { background-color: #28a745; }
-        .bg-amarillo { background-color: #ffc107; color: black; }
-        .bg-rojo { background-color: #dc3545; }
-    </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Dashboard de Monitoreo de Ciberseguridad</h2>
-        <button id="btn-actualizar" style="margin-bottom: 20px;">Actualizar Dashboard</button>
-        
-        <div id="contenedor-riesgos">
-            <p>Cargando matriz de riesgos...</p>
+    <nav class="navbar">
+        <div class="navbar-brand"><span class="dot"></span> Kushki · MERC-PD</div>
+        <div class="navbar-links">
+            <a href="/" class="active">Dashboard</a>
+            <a href="/activos/">Activos</a>
+            <a href="/riesgos/">Riesgos</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h2>Dashboard de Monitoreo</h2>
+            <p>Semáforo de riesgo cibernético en tiempo real, calculado con la metodología MERC-PD.</p>
+        </div>
+
+        <div class="container">
+            <button id="btn-actualizar" style="margin-bottom: 20px;">Actualizar Dashboard</button>
+
+            <div id="contenedor-riesgos">
+                <p>Cargando matriz de riesgos...</p>
+            </div>
         </div>
     </div>
-    
+
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

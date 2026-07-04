@@ -1,6 +1,11 @@
 function cargarDashboard() {
     const contenedor = document.getElementById('contenedor-riesgos');
+    const btnActualizar = document.getElementById('btn-actualizar');
+    
+    // 1. Mostrar mensaje de carga y bloquear el botón para evitar múltiples clics
     contenedor.innerHTML = '<p>Actualizando semáforos de riesgo...</p>';
+    btnActualizar.disabled = true;
+    btnActualizar.innerText = 'Cargando...';
 
     fetch('/api/riesgos/dashboard/')
         .then(response => response.json())
@@ -13,11 +18,9 @@ function cargarDashboard() {
             }
 
             data.riesgos.forEach(riesgo => {
-                // Lógica del semáforo visual
                 let claseColor = '';
                 let etiquetaRiesgo = '';
 
-                // Reglas de negocio MERC-PD para colores
                 if (riesgo.puntaje_total < 3.0) {
                     claseColor = 'bg-verde';
                     etiquetaRiesgo = 'Bajo';
@@ -29,7 +32,6 @@ function cargarDashboard() {
                     etiquetaRiesgo = riesgo.puntaje_total >= 7.5 ? 'Crítico' : 'Alto';
                 }
 
-                // Construcción dinámica de la tarjeta
                 const card = document.createElement('div');
                 card.className = 'card-riesgo';
                 card.innerHTML = `
@@ -50,6 +52,11 @@ function cargarDashboard() {
         .catch(error => {
             console.error('Error al cargar el dashboard:', error);
             contenedor.innerHTML = '<p style="color:red;">Error al conectar con la base de datos SQL Server.</p>';
+        })
+        .finally(() => {
+            // 2. Liberar el botón sin importar si hubo error o éxito
+            btnActualizar.disabled = false;
+            btnActualizar.innerText = 'Actualizar Dashboard';
         });
 }
 

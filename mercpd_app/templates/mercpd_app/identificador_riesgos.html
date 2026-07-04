@@ -7,34 +7,43 @@
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
-    <div class="container">
-        <h2>Identificación de Riesgos (Amenazas vs Vulnerabilidades)</h2>
+    <nav class="navbar">
+        <div class="navbar-brand"><span class="dot"></span> Kushki · MERC-PD</div>
+        <div class="navbar-links">
+            <a href="/">Dashboard</a>
+            <a href="/activos/">Activos</a>
+            <a href="/riesgos/" class="active">Riesgos</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h2>Identificación de Riesgos</h2>
+            <p>Cruce de Amenazas y Vulnerabilidades sobre un Activo registrado.</p>
+        </div>
+
+        <div class="container">
         <form id="form-riesgo">
             <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-            
+
             <div class="form-group">
                 <label for="activo_id">Seleccionar Activo:</label>
                 <select id="activo_id" name="activo_id" required>
-                    </select>
-            </div>
-
-            <div class="form-group">
-                <label for="amenaza">Amenaza Identificada:</label>
-                <select id="amenaza" name="amenaza" required>
-                    <option value="Ransomware">Ataque de Ransomware (Externa)</option>
-                    <option value="Inyeccion_API">Inyección en APIs (Externa)</option>
-                    <option value="Phishing">Phishing Avanzado (Externa)</option>
-                    <option value="Fuga_Interna">Fuga de información maliciosa (Interna)</option>
+                    <option value="" disabled selected>Cargando activos...</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="vulnerabilidad">Vulnerabilidad Asociada:</label>
-                <select id="vulnerabilidad" name="vulnerabilidad" required>
-                    <option value="Falta_Parches">Ausencia de parches de seguridad (Tecnológica)</option>
-                    <option value="Cifrado_Debil">Cifrado débil en reposo/tránsito (Tecnológica)</option>
-                    <option value="Falta_Cultura">Falta de cultura en ciberseguridad (Organizacional)</option>
-                    <option value="Sin_RBAC">Deficiencia en control de accesos RBAC (Procesos)</option>
+                <label for="amenaza_id">Amenaza Identificada:</label>
+                <select id="amenaza_id" name="amenaza_id" required>
+                    <option value="" disabled selected>Cargando amenazas...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="vulnerabilidad_id">Vulnerabilidad Asociada:</label>
+                <select id="vulnerabilidad_id" name="vulnerabilidad_id" required>
+                    <option value="" disabled selected>Cargando vulnerabilidades...</option>
                 </select>
             </div>
 
@@ -61,6 +70,7 @@
             <button type="submit">Evaluar y Guardar Riesgo</button>
         </form>
         <div id="resultado-riesgo" class="alert hidden"></div>
+        </div>
     </div>
     <script src="/static/js/riesgos.js"></script>
 </body>
