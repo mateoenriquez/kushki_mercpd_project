@@ -2,6 +2,8 @@ from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from .models import Activo, EscenarioRiesgo
+from django.shortcuts import render
+
 
 def calcular_valor_activo(c, i, d):
     """
@@ -83,3 +85,58 @@ def vista_dashboard_datos(request):
         })
         
     return JsonResponse({'datos': datos})
+
+def api_dashboard_datos(request):
+    """
+    API que alimenta el Dashboard en tiempo real. 
+    Simula la extracción de los cálculos MERC-PD de la Base de Datos.
+    """
+    datos_mercpd = {
+        "estadisticas": {
+            "total_activos": 12,
+            "riesgos_criticos": 2,
+            "riesgos_medios": 5,
+            "riesgos_bajos": 5
+        },
+        "riesgos": [
+            {
+                "id": 1, 
+                "activo": "Base de Datos de Tarjetas (Kushki)", 
+                "amenaza": "Ransomware / Cifrado no autorizado", 
+                "probabilidad": 3, 
+                "impacto_final": 3.0, 
+                "nivel": "Crítico"
+            },
+            {
+                "id": 2, 
+                "activo": "API de Transacciones", 
+                "amenaza": "Ataque de Denegación de Servicio (DDoS)", 
+                "probabilidad": 2, 
+                "impacto_final": 2.2, 
+                "nivel": "Medio"
+            },
+            {
+                "id": 3, 
+                "activo": "Laptops Corporativas", 
+                "amenaza": "Pérdida o Robo de equipo", 
+                "probabilidad": 1, 
+                "impacto_final": 1.0, 
+                "nivel": "Bajo"
+            }
+        ]
+    }
+    return JsonResponse(datos_mercpd)
+
+# --- VISTAS DEL FRONTEND (INTERFAZ GRÁFICA) ---
+
+def vista_dashboard_principal(request):
+    """Renderiza la pantalla 3: El Dashboard del Semáforo"""
+    return render(request, 'mercpd_app/dashboard.html')
+
+def vista_registro_activos(request):
+    """Renderiza la pantalla 1: Ingreso de Activos"""
+    return render(request, 'mercpd_app/activos.html')
+
+def vista_identificacion_riesgos(request):
+    """Renderiza la pantalla 2: Cruce de Amenazas y Vulnerabilidades"""
+    return render(request, 'mercpd_app/identificador_riesgos.html')
