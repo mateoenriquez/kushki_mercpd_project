@@ -90,12 +90,20 @@ document.getElementById('form-riesgo').addEventListener('submit', function(e) {
         const divResultado = document.getElementById('resultado-riesgo');
         divResultado.classList.remove('hidden');
         if (result.success) {
-            divResultado.innerHTML = `<strong>Éxito:</strong> Riesgo calculado. Puntaje Final: ${result.riesgo_total.toFixed(2)}`;
-            divResultado.style.color = 'green';
+            let extra = `Nivel: <strong>${result.nivel_riesgo}</strong> · Plazo límite de tratamiento: <strong>${result.fecha_limite_tratamiento}</strong> (Sección 6.3 MERC-PD).`;
+            if (result.piso_aplicado) {
+                extra += `<br><span style="color: var(--color-warning);">⚠ ${result.mensaje_piso}</span>`;
+            }
+            divResultado.innerHTML = `<strong>Éxito:</strong> Riesgo calculado. Puntaje Final: ${result.riesgo_total.toFixed(2)}<br>${extra}`;
+            divResultado.style.backgroundColor = 'var(--color-success-bg)';
+            divResultado.style.color = 'var(--color-success)';
+            divResultado.style.borderColor = 'var(--color-success)';
             this.reset();
         } else {
             divResultado.innerHTML = `<strong>Error:</strong> ${result.message}`;
-            divResultado.style.color = 'red';
+            divResultado.style.backgroundColor = 'var(--color-danger-bg)';
+            divResultado.style.color = 'var(--color-danger)';
+            divResultado.style.borderColor = 'var(--color-danger)';
         }
     })
     .catch(error => console.error('Error al registrar riesgo:', error));

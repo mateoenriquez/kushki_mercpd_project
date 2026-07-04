@@ -6,10 +6,10 @@ urlpatterns = [
     # Autenticación
     path('login/', views.vista_login, name='login'),
     path('logout/', views.vista_logout, name='logout'),
-    
+
     # Panel de administración interno de Django
     path('admin/', admin.site.urls),
-    
+
     # Registro de usuarios (solo Administrador)
     path('usuarios/registrar/', views.vista_registro_usuario, name='registro_usuario'),
 
@@ -30,10 +30,11 @@ urlpatterns = [
 
     # Dashboard en tiempo real (Pantalla 3)
     path('api/riesgos/dashboard/', views.api_dashboard_datos, name='api_dashboard_datos'),
+    path('api/riesgos/kpis/', views.api_dashboard_kpis, name='api_dashboard_kpis'),
 
     # Recálculo puntual (uso interno / mantenimiento, no llamado por el frontend)
     path('api/evaluar-riesgo/<int:escenario_id>/', views.procesar_evaluacion_riesgo, name='api_evaluar_riesgo'),
-    
+
     # Pantallas 4 y 5 (Frontend)
     path('tratamientos/', views.vista_tratamiento_riesgo, name='tratamientos'),
     path('comunicacion/', views.vista_comunicacion_reportes, name='comunicacion'),

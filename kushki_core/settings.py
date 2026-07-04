@@ -4,12 +4,23 @@ import os
 # 1. Rutas base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 2. Llave de seguridad (Requerida por Django para arrancar)
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-kushki-mercpd-super-secret-key-2026')
+# 2. Llave de seguridad
+# IMPORTANTE (hallazgo de seguridad corregido en Fase 4): en un entorno real
+# NUNCA se debe dejar un SECRET_KEY hardcodeado en el repositorio. Aquí se
+# exige la variable de entorno; solo se usa un valor de repuesto si no existe
+# (útil para que el proyecto arranque en la demo local del curso).
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-CAMBIAR-EN-PRODUCCION-kushki-mercpd-2026'
+)
 
-# 3. Modo de depuración (True para desarrollo local)
+# 3. Modo de depuración: por defecto False (seguro). Para desarrollo local,
+# exportar DJANGO_DEBUG=True antes de correr runserver.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+
+# ALLOWED_HOSTS ya no acepta '*' por defecto; en desarrollo local basta con
+# localhost/127.0.0.1. Para otro host, definir DJANGO_ALLOWED_HOSTS.
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # 4. Aplicaciones instaladas (Aquí registramos tu app 'mercpd_app')
 INSTALLED_APPS = [
@@ -59,8 +70,8 @@ WSGI_APPLICATION = 'kushki_core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': 'Kushki_MERCPD',
-        'HOST': '.',
+        'NAME': os.environ.get('DJANGO_DB_NAME', 'Kushki_MERCPD'),
+        'HOST': os.environ.get('DJANGO_DB_HOST', '.'),
         'PORT': '',
 
         'OPTIONS': {
@@ -74,3 +85,13 @@ DATABASES = {
 # 9. Archivos estáticos (CSS, JS)
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# 10. Endurecimiento de sesiones y cookies (Fase 4 - hallazgos de seguridad)
+# En producción (detrás de HTTPS) exportar DJANGO_SECURE_COOKIES=True.
+SECURE_COOKIES = os.environ.get('DJANGO_SECURE_COOKIES', 'False') == 'True'
+SESSION_COOKIE_SECURE = SECURE_COOKIES
+CSRF_COOKIE_SECURE = SECURE_COOKIES
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = 60 * 60 * 4  # 4 horas de sesión inactiva
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+X_FRAME_OPTIONS = 'DENY'

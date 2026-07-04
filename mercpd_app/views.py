@@ -1,11 +1,13 @@
 import csv
 import json
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.db import connection
 from django.db.models import Prefetch
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from functools import wraps
 from django.shortcuts import redirect
@@ -102,20 +104,66 @@ def calcular_valor_activo(c, i, d):
 
 def calcular_impacto_y_riesgo(va, probabilidad, impacto_operativo, impacto_spdp, impacto_financiero):
     """
-    Reglas de Negocio 2, 3 y 4:
-    - Impacto Base = max(Operativo, SPDP, Financiero)
+    Reglas de Negocio 2, 3 y 4, alineadas con la metodología MERC-PD (Tarea 8):
+
+    - Factor Suelo / Piso de Criticidad (Sección 3.4, regla 1): si el activo
+      tiene VA >= 2.5 (Muy Alto/Crítico), el impacto de Protección de Datos
+      (SPDP) no puede quedar por debajo de 3 (Alto). Cualquier incidente que
+      toque un activo tan crítico arrastra automáticamente ese nivel de
+      exposición regulatoria, sin importar lo capturado por el evaluador.
+    - Impacto Base = max(Operativo, SPDP [con piso aplicado], Financiero)
     - Impacto Final = Impacto Base * (VA / 3.0)
     - Riesgo Total = Probabilidad * Impacto Final
-    """
-    impacto_base = max(impacto_operativo, impacto_spdp, impacto_financiero)
 
-    impacto_final = impacto_base * (float(va) / 3.0)
+    Devuelve además `piso_aplicado` para informar al usuario en el frontend.
+    """
+    va_float = float(va)
+
+    impacto_spdp_efectivo = impacto_spdp
+    piso_aplicado = False
+    if va_float >= 2.5 and impacto_spdp < 3:
+        impacto_spdp_efectivo = 3
+        piso_aplicado = True
+
+    impacto_base = max(impacto_operativo, impacto_spdp_efectivo, impacto_financiero)
+
+    impacto_final = impacto_base * (va_float / 3.0)
     impacto_final_dec = Decimal(str(impacto_final)).quantize(Decimal('0.001'))
 
     riesgo_total = probabilidad * float(impacto_final_dec)
     riesgo_total_dec = Decimal(str(riesgo_total)).quantize(Decimal('0.001'))
 
-    return impacto_base, impacto_final_dec, riesgo_total_dec
+    return impacto_base, impacto_final_dec, riesgo_total_dec, piso_aplicado
+
+
+def calcular_fecha_limite(riesgo_total):
+    """
+    Tiempos de respuesta obligatorios por nivel (Sección 6.3 de la
+    metodología): Bajo -> 90 días, Medio -> 30 días, Alto -> 15 días,
+    Crítico -> 7 días (corrección definitiva tras la contención de 0-24h).
+    """
+    riesgo_total = float(riesgo_total)
+    if riesgo_total >= 7.5:
+        dias = 7
+    elif riesgo_total >= 5.0:
+        dias = 15
+    elif riesgo_total >= 3.0:
+        dias = 30
+    else:
+        dias = 90
+    return timezone.now() + timedelta(days=dias)
+
+
+def nivel_de_riesgo(puntaje):
+    """Traduce un puntaje numérico al nivel cualitativo (Sección 6.2)."""
+    puntaje = float(puntaje)
+    if puntaje >= 7.5:
+        return 'Critico'
+    if puntaje >= 5.0:
+        return 'Alto'
+    if puntaje >= 3.0:
+        return 'Medio'
+    return 'Bajo'
 
 
 # ============================================================
@@ -171,10 +219,14 @@ def api_activos_lista(request):
     ]
     return JsonResponse({'activos': data})
 
+
+@login_requerido
 def api_usuarios_lista(request):
     """
     Devuelve el catálogo de usuarios registrados en el sistema, usado para
     poblar el <select> de Custodio en la Pantalla 1 (Registro de Activos).
+    Requiere sesión activa: expone nombres y roles del personal, por lo que
+    no debe quedar público (hallazgo de seguridad corregido en Fase 4).
     """
     usuarios = Usuario.objects.all().order_by('nombre')
     data = [
@@ -184,6 +236,7 @@ def api_usuarios_lista(request):
     return JsonResponse({'usuarios': data})
 
 
+@login_requerido
 def api_amenazas_lista(request):
     """
     Devuelve el catálogo REAL de amenazas (sembrado en la Fase 1 en SQL Server),
@@ -197,6 +250,7 @@ def api_amenazas_lista(request):
     return JsonResponse({'amenazas': data})
 
 
+@login_requerido
 def api_vulnerabilidades_lista(request):
     """
     Devuelve el catálogo REAL de vulnerabilidades (sembrado en la Fase 1 en SQL Server),
@@ -254,6 +308,7 @@ def api_activos_registrar(request):
             'success': True,
             'va': float(va),
             'activo_id': activo.activoid,
+            'critico': va >= Decimal('2.5'),
         })
 
     except (ValueError, TypeError, KeyError):
@@ -262,23 +317,28 @@ def api_activos_registrar(request):
         return JsonResponse({'success': False, 'message': 'Formato de solicitud inválido (JSON).'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
-    
 
+
+@login_requerido
 def api_escenarios_lista(request):
     """
     Devuelve el listado de escenarios de riesgo ya evaluados, usado para
     poblar el <select> de Escenario en las Pantallas 4 (Tratamiento) y
-    5 (Comunicación).
+    5 (Comunicación). Protegido con sesión: incluye puntajes de riesgo.
     """
     escenarios = EscenarioRiesgo.objects.select_related(
         'activo', 'amenaza', 'vulnerabilidad'
     ).order_by('-fechaevaluacion')
+
+    if request.session.get('usuario_rol') == 'Custodio de Activo':
+        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
 
     data = [
         {
             'id': e.escenarioid,
             'etiqueta': f"{e.activo.nombre} | {e.amenaza.nombre} x {e.vulnerabilidad.nombre} (Riesgo: {e.riesgototal})",
             'riesgo_total': float(e.riesgototal),
+            'va_activo': float(e.activo.valoractivo),
         }
         for e in escenarios
     ]
@@ -294,11 +354,9 @@ def api_escenarios_lista(request):
 def api_riesgos_evaluar(request):
     """
     Registra un escenario de riesgo (Amenaza x Vulnerabilidad sobre un Activo)
-    y aplica las Reglas de Negocio 2, 3 y 4 de la metodología MERC-PD.
-
-    Amenaza y Vulnerabilidad se referencian por su ID REAL del catálogo
-    (tablas Amenazas/Vulnerabilidades sembradas en la Fase 1), poblado
-    dinámicamente en el frontend igual que el <select> de Activos.
+    y aplica las Reglas de Negocio 2, 3 y 4 de la metodología MERC-PD,
+    incluyendo el Factor Suelo (Sección 3.4) y el cálculo de la fecha límite
+    de tratamiento (Sección 6.3).
     """
     try:
         body = json.loads(request.body)
@@ -321,13 +379,15 @@ def api_riesgos_evaluar(request):
         if not all(1 <= v <= 3 for v in campos_1_3):
             return JsonResponse({'success': False, 'message': 'Probabilidad e impactos deben estar entre 1 y 3.'})
 
-        impacto_base, impacto_final_dec, riesgo_total_dec = calcular_impacto_y_riesgo(
+        impacto_base, impacto_final_dec, riesgo_total_dec, piso_aplicado = calcular_impacto_y_riesgo(
             va=activo.valoractivo,
             probabilidad=probabilidad,
             impacto_operativo=impacto_operativo,
             impacto_spdp=impacto_spdp,
             impacto_financiero=impacto_financiero,
         )
+
+        fecha_limite = calcular_fecha_limite(riesgo_total_dec)
 
         escenario = EscenarioRiesgo.objects.create(
             activo=activo,
@@ -340,7 +400,13 @@ def api_riesgos_evaluar(request):
             impactobase=impacto_base,
             impactofinal=impacto_final_dec,
             riesgototal=riesgo_total_dec,
+            fechalimitetratamiento=fecha_limite,
         )
+
+        mensaje_piso = (
+            'Se aplicó el Factor Suelo: el activo tiene VA >= 2.5, por lo que el '
+            'impacto de Protección de Datos (SPDP) se elevó automáticamente a Alto (3).'
+        ) if piso_aplicado else None
 
         return JsonResponse({
             'success': True,
@@ -348,6 +414,10 @@ def api_riesgos_evaluar(request):
             'impacto_base': impacto_base,
             'impacto_final': float(impacto_final_dec),
             'riesgo_total': float(riesgo_total_dec),
+            'nivel_riesgo': nivel_de_riesgo(riesgo_total_dec),
+            'fecha_limite_tratamiento': fecha_limite.strftime('%Y-%m-%d'),
+            'piso_aplicado': piso_aplicado,
+            'mensaje_piso': mensaje_piso,
         })
 
     except (ValueError, TypeError, KeyError):
@@ -366,7 +436,8 @@ def api_riesgos_evaluar(request):
 def api_dashboard_datos(request):
     """
     Alimenta el Dashboard. Si el usuario es Custodio de Activo, el semáforo
-    se limita a sus propios activos (filtrado real, no visual).
+    se limita a sus propios activos (filtrado real, no visual). Incluye
+    fecha de detección, fecha límite y estado de SLA (Sección 6.3).
     """
     escenarios = EscenarioRiesgo.objects.select_related(
         'activo', 'amenaza', 'vulnerabilidad'
@@ -383,10 +454,18 @@ def api_dashboard_datos(request):
         )
     ).order_by('-fechaevaluacion')
 
+    ahora = timezone.now()
     riesgos = []
     for esc in escenarios:
         ultimo_tratamiento = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
         riesgo_actual = float(ultimo_tratamiento.riesgoresidual) if ultimo_tratamiento else float(esc.riesgototal)
+
+        vencido = bool(
+            not ultimo_tratamiento and esc.fechalimitetratamiento and esc.fechalimitetratamiento < ahora
+        )
+        dias_restantes = None
+        if not ultimo_tratamiento and esc.fechalimitetratamiento:
+            dias_restantes = (esc.fechalimitetratamiento - ahora).days
 
         riesgos.append({
             'escenario_id': esc.escenarioid,
@@ -400,9 +479,74 @@ def api_dashboard_datos(request):
             'estado_tratamiento': ultimo_tratamiento.opciontratamiento if ultimo_tratamiento else 'Sin Tratamiento',
             'riesgo_actual': riesgo_actual,
             'puntaje_total': riesgo_actual,
+            'fecha_deteccion': esc.fechaevaluacion.strftime('%Y-%m-%d'),
+            'fecha_limite_tratamiento': esc.fechalimitetratamiento.strftime('%Y-%m-%d') if esc.fechalimitetratamiento else None,
+            'dias_restantes': dias_restantes,
+            'vencido': vencido,
         })
 
     return JsonResponse({'riesgos': riesgos})
+
+
+@login_requerido
+def api_dashboard_kpis(request):
+    """
+    Alimenta los gráficos del dashboard con los KPIs de monitoreo continuo
+    de la metodología MERC-PD (Sección 7.3): distribución de riesgos por
+    zona del semáforo, riesgo acumulado por categoría de activo, Índice de
+    Riesgo Residual Promedio (IRRP), % de riesgos críticos sin control y
+    cumplimiento de SLA (escenarios vencidos vs. en plazo).
+    """
+    escenarios = EscenarioRiesgo.objects.select_related('activo').prefetch_related(
+        Prefetch('tratamiento_set', queryset=Tratamiento.objects.order_by('-fechatratamiento'), to_attr='tratamientos_ordenados')
+    )
+
+    if request.session.get('usuario_rol') == 'Custodio de Activo':
+        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
+
+    ahora = timezone.now()
+    zonas = {'Bajo': 0, 'Medio': 0, 'Alto': 0, 'Critico': 0}
+    por_categoria = {}
+    criticos_totales = 0
+    criticos_sin_control = 0
+    vencidos = 0
+    en_plazo = 0
+    suma_riesgo = 0.0
+    total = 0
+
+    for esc in escenarios:
+        ultimo = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
+        riesgo_actual = float(ultimo.riesgoresidual) if ultimo else float(esc.riesgototal)
+        suma_riesgo += riesgo_actual
+        total += 1
+
+        nivel = nivel_de_riesgo(riesgo_actual)
+        zonas[nivel] += 1
+        if nivel == 'Critico':
+            criticos_totales += 1
+            if not ultimo:
+                criticos_sin_control += 1
+
+        cat = esc.activo.categoria
+        por_categoria[cat] = round(por_categoria.get(cat, 0.0) + riesgo_actual, 3)
+
+        if not ultimo and esc.fechalimitetratamiento:
+            if esc.fechalimitetratamiento < ahora:
+                vencidos += 1
+            else:
+                en_plazo += 1
+
+    irrp = round(suma_riesgo / total, 3) if total else 0.0
+    pct_criticos_sin_control = round((criticos_sin_control / criticos_totales * 100), 1) if criticos_totales else 0.0
+
+    return JsonResponse({
+        'distribucion_zonas': zonas,
+        'riesgo_por_categoria': por_categoria,
+        'irrp': irrp,
+        'pct_criticos_sin_control': pct_criticos_sin_control,
+        'sla': {'vencidos': vencidos, 'en_plazo': en_plazo},
+        'total_escenarios': total,
+    })
 
 
 # ============================================================
@@ -449,7 +593,7 @@ def procesar_evaluacion_riesgo(request, escenario_id):
     escenario = get_object_or_404(EscenarioRiesgo, pk=escenario_id)
     activo = escenario.activo
 
-    impacto_base, impacto_final_dec, riesgo_total_dec = calcular_impacto_y_riesgo(
+    impacto_base, impacto_final_dec, riesgo_total_dec, piso_aplicado = calcular_impacto_y_riesgo(
         va=activo.valoractivo,
         probabilidad=escenario.probabilidad,
         impacto_operativo=escenario.impactooperativo,
@@ -460,6 +604,8 @@ def procesar_evaluacion_riesgo(request, escenario_id):
     escenario.impactobase = impacto_base
     escenario.impactofinal = impacto_final_dec
     escenario.riesgototal = riesgo_total_dec
+    if not escenario.fechalimitetratamiento:
+        escenario.fechalimitetratamiento = calcular_fecha_limite(riesgo_total_dec)
     escenario.save()
 
     return JsonResponse({
@@ -469,9 +615,10 @@ def procesar_evaluacion_riesgo(request, escenario_id):
             'impacto_base': impacto_base,
             'impacto_final': str(impacto_final_dec),
             'riesgo_total': str(riesgo_total_dec),
+            'piso_aplicado': piso_aplicado,
         }
     })
-    
+
 # ============================================================
 # API - PANTALLA 4: TRATAMIENTO DEL RIESGO
 # ============================================================
@@ -483,6 +630,13 @@ def api_tratamientos_registrar(request):
     Registra un tratamiento de riesgo (Aspecto 3: Tratamiento del riesgo),
     tomando como referencia las opciones de respuesta de ISO/IEC 27002:2022
     (Mitigar, Transferir, Evitar, Aceptar).
+
+    Regla de "Priorización automática de controles" (Sección 3.4.3 y Regla
+    de aplicación 6.2 de la metodología MERC-PD): no se permite 'Aceptar'
+    un riesgo Alto/Crítico (>=5.0) ni un riesgo sobre un activo con
+    VA >= 2.5. El trigger trg_ValidarAceptacionRiesgo en SQL Server actúa
+    como respaldo si alguien intenta saltarse esta validación por fuera
+    de la aplicación.
 
     El Riesgo Residual (Aspecto 4) lo recalcula automáticamente el trigger
     trg_ActualizarRiesgoResidual en SQL Server justo después del INSERT;
@@ -500,6 +654,18 @@ def api_tratamientos_registrar(request):
         if opcion not in opciones_validas:
             return JsonResponse({'success': False, 'message': f'Opción inválida. Use una de: {", ".join(opciones_validas)}.'})
 
+        va_activo = float(escenario.activo.valoractivo)
+        riesgo_actual = float(escenario.riesgototal)
+        if opcion == 'Aceptar' and (va_activo >= 2.5 or riesgo_actual >= 5.0):
+            return JsonResponse({
+                'success': False,
+                'message': (
+                    'No se puede ACEPTAR este riesgo: es Alto/Crítico o pertenece a un activo '
+                    'con Valor >= 2.5 (metodología MERC-PD, Secciones 3.4.3 y 6.2). '
+                    'Seleccione Mitigar, Transferir o Evitar.'
+                ),
+            })
+
         control = (body.get('control_aplicado') or '').strip()
         if not control:
             return JsonResponse({'success': False, 'message': 'Debe describir el control aplicado.'})
@@ -513,6 +679,7 @@ def api_tratamientos_registrar(request):
             opciontratamiento=opcion,
             controlaplicado=control,
             eficaciacontrol=eficacia,
+            fechalimitecierre=escenario.fechalimitetratamiento,
         )
         tratamiento.refresh_from_db()  # trae el RiesgoResidual calculado por el trigger
 
@@ -527,7 +694,12 @@ def api_tratamientos_registrar(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Formato de solicitud inválido (JSON).'}, status=400)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
+        mensaje = str(e)
+        # El trigger trg_ValidarAceptacionRiesgo de SQL Server puede rechazar
+        # el INSERT como respaldo; se traduce a un mensaje claro para el usuario.
+        if 'ACEPTAR' in mensaje.upper():
+            return JsonResponse({'success': False, 'message': 'La base de datos rechazó la operación: no se puede aceptar un riesgo Alto/Crítico.'}, status=400)
+        return JsonResponse({'success': False, 'message': f'Error inesperado: {mensaje}'}, status=500)
 
 
 # ============================================================

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MERC-PD | Dashboard de Monitoreo</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="/static/js/vendor/chart.umd.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -30,6 +31,32 @@
         <div class="page-header">
             <h2>Dashboard de Monitoreo</h2>
             <p>Semáforo de riesgo cibernético en tiempo real, calculado con la metodología MERC-PD.</p>
+        </div>
+
+        <!-- Tarjetas de KPIs (Sección 7.3 de la metodología) -->
+        <div class="container" style="margin-bottom: 20px;">
+            <div id="kpi-cards" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px;">
+                <p>Cargando indicadores...</p>
+            </div>
+        </div>
+
+        <!-- Gráficos: distribución por zona, riesgo por categoría y cumplimiento SLA -->
+        <div class="container" style="margin-bottom: 20px;">
+            <h3 style="margin-top:0;">Indicadores Visuales</h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:24px;">
+                <div>
+                    <p style="text-align:center; font-weight:600; color: var(--color-text-muted); font-size:0.85rem; text-transform:uppercase;">Riesgos por Nivel</p>
+                    <canvas id="chart-zonas" height="220"></canvas>
+                </div>
+                <div>
+                    <p style="text-align:center; font-weight:600; color: var(--color-text-muted); font-size:0.85rem; text-transform:uppercase;">Riesgo Acumulado por Categoría de Activo</p>
+                    <canvas id="chart-categoria" height="220"></canvas>
+                </div>
+                <div>
+                    <p style="text-align:center; font-weight:600; color: var(--color-text-muted); font-size:0.85rem; text-transform:uppercase;">Cumplimiento de Plazos (SLA)</p>
+                    <canvas id="chart-sla" height="220"></canvas>
+                </div>
+            </div>
         </div>
 
         <div class="container">

@@ -1,4 +1,5 @@
 from django.db import models
+from decimal import Decimal
 
 
 class Usuario(models.Model):
@@ -73,6 +74,11 @@ class EscenarioRiesgo(models.Model):
     riesgototal = models.DecimalField(max_digits=5, decimal_places=3, db_column='RiesgoTotal')
     fechaevaluacion = models.DateTimeField(auto_now_add=True, db_column='FechaEvaluacion')
 
+    # Trazabilidad temporal (Sección 6.3 de la metodología MERC-PD): plazo
+    # máximo para tratar el riesgo, calculado según su nivel (Bajo/Medio/
+    # Alto/Crítico) en el momento del registro.
+    fechalimitetratamiento = models.DateTimeField(db_column='FechaLimiteTratamiento', blank=True, null=True)
+
     class Meta:
         managed = False
         db_table = '[mercpd].[EscenariosRiesgo]'
@@ -84,13 +90,17 @@ class Tratamiento(models.Model):
     opciontratamiento = models.CharField(max_length=50, db_column='OpcionTratamiento')
     controlaplicado = models.CharField(max_length=500, db_column='ControlAplicado')
     eficaciacontrol = models.DecimalField(max_digits=3, decimal_places=2, db_column='EficaciaControl')
-    riesgoresidual = models.DecimalField(max_digits=5, decimal_places=3, db_column='RiesgoResidual')
+    riesgoresidual = models.DecimalField(max_digits=5, decimal_places=3, db_column='RiesgoResidual', default=Decimal('0.000'))
     fechatratamiento = models.DateTimeField(auto_now_add=True, db_column='FechaTratamiento')
+
+    # Evidencia de cumplimiento SLA: plazo que estaba vigente al registrar
+    # este tratamiento (permite calcular el KPI de cumplimiento de la matriz).
+    fechalimitecierre = models.DateTimeField(db_column='FechaLimiteCierre', blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = '[mercpd].[Tratamientos]'
-        
+
 class Comunicacion(models.Model):
     TIPO_CHOICES = [
         ('Observacion', 'Observación'),
