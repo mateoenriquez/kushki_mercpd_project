@@ -10,9 +10,11 @@
     <nav class="navbar">
         <div class="navbar-links">
             <a href="/">Dashboard</a>
-            <a href="/activos/">Activos</a>
-            <a href="/riesgos/">Riesgos</a>
-            <a href="/tratamientos/">Tratamientos</a>
+            {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}
+                <a href="/activos/">Activos</a>
+                <a href="/riesgos/">Riesgos</a>
+                <a href="/tratamientos/">Tratamientos</a>
+            {% endif %}
             <a href="/comunicacion/">Comunicación</a>
             {% if request.session.usuario_rol == 'Administrador' %}
                 <a href="/usuarios/registrar/">Usuarios</a>

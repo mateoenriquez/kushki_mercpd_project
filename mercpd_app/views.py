@@ -127,17 +127,17 @@ def vista_dashboard_principal(request):
     """Renderiza la Pantalla 3: El Dashboard del Semáforo"""
     return render(request, 'mercpd_app/dashboard.html')
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def vista_registro_activos(request):
     """Renderiza la Pantalla 1: Ingreso de Activos"""
     return render(request, 'mercpd_app/activos.html')
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def vista_identificacion_riesgos(request):
     """Renderiza la Pantalla 2: Cruce de Amenazas y Vulnerabilidades"""
     return render(request, 'mercpd_app/identificador_riesgos.html')
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def vista_tratamiento_riesgo(request):
     """Renderiza la Pantalla 4: Tratamiento del Riesgo"""
     return render(request, 'mercpd_app/tratamientos.html')
@@ -152,22 +152,24 @@ def vista_comunicacion_reportes(request):
 # API - PANTALLA 1: REGISTRO Y VALORACIÓN DE ACTIVOS
 # ============================================================
 
+@login_requerido
 def api_activos_lista(request):
     """
-    Devuelve el listado de activos registrados, usado para poblar
-    el <select> de la Pantalla 2 (Identificación de Riesgos).
+    Devuelve el listado de activos. Si el usuario logueado es Custodio de
+    Activo, se filtra para que solo vea los activos donde él es el custodio
+    asignado (CustodioID) — esto es el "filtrado real" pedido, no solo
+    ocultar botones en el frontend.
     """
     activos = Activo.objects.all().order_by('nombre')
+
+    if request.session.get('usuario_rol') == 'Custodio de Activo':
+        activos = activos.filter(custodio_id=request.session.get('usuario_id'))
+
     data = [
-        {
-            'id': a.activoid,
-            'nombre': a.nombre,
-            'va': float(a.valoractivo),
-        }
+        {'id': a.activoid, 'nombre': a.nombre, 'va': float(a.valoractivo)}
         for a in activos
     ]
     return JsonResponse({'activos': data})
-
 
 def api_usuarios_lista(request):
     """
@@ -208,7 +210,7 @@ def api_vulnerabilidades_lista(request):
     return JsonResponse({'vulnerabilidades': data})
 
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 @require_http_methods(["POST"])
 def api_activos_registrar(request):
     """
@@ -287,7 +289,7 @@ def api_escenarios_lista(request):
 # API - PANTALLA 2: IDENTIFICACIÓN DE RIESGOS
 # ============================================================
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 @require_http_methods(["POST"])
 def api_riesgos_evaluar(request):
     """
@@ -360,14 +362,20 @@ def api_riesgos_evaluar(request):
 # API - PANTALLA 3: DASHBOARD DE MONITOREO (SEMÁFORO)
 # ============================================================
 
+@login_requerido
 def api_dashboard_datos(request):
     """
-    Alimenta el Dashboard en tiempo real con datos REALES de SQL Server,
-    incluyendo el estado de tratamiento y el riesgo actual (post-mitigación).
+    Alimenta el Dashboard. Si el usuario es Custodio de Activo, el semáforo
+    se limita a sus propios activos (filtrado real, no visual).
     """
     escenarios = EscenarioRiesgo.objects.select_related(
         'activo', 'amenaza', 'vulnerabilidad'
-    ).prefetch_related(
+    )
+
+    if request.session.get('usuario_rol') == 'Custodio de Activo':
+        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
+
+    escenarios = escenarios.prefetch_related(
         Prefetch(
             'tratamiento_set',
             queryset=Tratamiento.objects.order_by('-fechatratamiento'),
@@ -391,7 +399,7 @@ def api_dashboard_datos(request):
             'riesgo_inherente': float(esc.riesgototal),
             'estado_tratamiento': ultimo_tratamiento.opciontratamiento if ultimo_tratamiento else 'Sin Tratamiento',
             'riesgo_actual': riesgo_actual,
-            'puntaje_total': riesgo_actual,  # el semáforo ahora colorea según el riesgo ACTUAL
+            'puntaje_total': riesgo_actual,
         })
 
     return JsonResponse({'riesgos': riesgos})
@@ -416,7 +424,7 @@ def vista_registro_usuario(request):
         if not all([nombre, email, rol, password]):
             return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Todos los campos son obligatorios.'})
 
-        if rol not in ('Administrador', 'Arquitecto de Seguridad'):
+        if rol not in ('Administrador', 'Arquitecto de Seguridad', 'Custodio de Activo', 'Auditor'):
             return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Rol inválido.'})
 
         if Usuario.objects.filter(email=email).exists():
@@ -468,7 +476,7 @@ def procesar_evaluacion_riesgo(request, escenario_id):
 # API - PANTALLA 4: TRATAMIENTO DEL RIESGO
 # ============================================================
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 @require_http_methods(["POST"])
 def api_tratamientos_registrar(request):
     """
@@ -526,18 +534,19 @@ def api_tratamientos_registrar(request):
 # API - PANTALLA 5: COMUNICACIÓN, CONSULTA Y REPORTES
 # ============================================================
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad', 'Custodio de Activo')
 @require_http_methods(["POST"])
 def api_comunicaciones_registrar(request):
-    """
-    Registra una observación o recomendación sobre un escenario de riesgo
-    (Aspecto 5: Comunicación y consulta).
-    """
     try:
         body = json.loads(request.body)
 
         escenario_id = int(body.get('escenario_id'))
         escenario = get_object_or_404(EscenarioRiesgo, pk=escenario_id)
+
+        # Un Custodio solo puede comentar escenarios de SUS activos
+        if request.session.get('usuario_rol') == 'Custodio de Activo':
+            if escenario.activo.custodio_id != request.session.get('usuario_id'):
+                return JsonResponse({'success': False, 'message': 'Solo puede registrar comunicaciones sobre sus propios activos.'}, status=403)
 
         tipo = (body.get('tipo') or '').strip()
         if tipo not in ('Observacion', 'Recomendacion'):
@@ -547,14 +556,9 @@ def api_comunicaciones_registrar(request):
         if not contenido:
             return JsonResponse({'success': False, 'message': 'El contenido no puede estar vacío.'})
 
-        usuario_id_raw = body.get('usuario_id')
-        usuario_id = int(usuario_id_raw) if usuario_id_raw else None
-        if usuario_id is not None:
-            get_object_or_404(Usuario, pk=usuario_id)
-
         comunicacion = Comunicacion.objects.create(
             escenario=escenario,
-            usuario_id=usuario_id,
+            usuario_id=request.session.get('usuario_id'),
             tipo=tipo,
             contenido=contenido,
         )
@@ -569,12 +573,13 @@ def api_comunicaciones_registrar(request):
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
 
 
+@login_requerido
 def api_comunicaciones_lista(request):
-    """
-    Devuelve las observaciones/recomendaciones registradas, opcionalmente
-    filtradas por escenario (?escenario_id=).
-    """
-    comunicaciones = Comunicacion.objects.select_related('escenario', 'usuario').order_by('-fechacomunicacion')
+    # nota: select_related directo a activo no aplica aquí; se filtra vía escenario__activo
+    comunicaciones = Comunicacion.objects.select_related('escenario__activo', 'usuario').order_by('-fechacomunicacion')
+
+    if request.session.get('usuario_rol') == 'Custodio de Activo':
+        comunicaciones = comunicaciones.filter(escenario__activo__custodio_id=request.session.get('usuario_id'))
 
     escenario_id = request.GET.get('escenario_id')
     if escenario_id:
@@ -594,6 +599,7 @@ def api_comunicaciones_lista(request):
     return JsonResponse({'comunicaciones': data})
 
 
+@rol_requerido('Administrador', 'Arquitecto de Seguridad', 'Auditor')
 def api_reporte_csv(request):
     """
     Genera un reporte descargable (CSV) para partes interesadas, leyendo

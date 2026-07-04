@@ -11,11 +11,15 @@
         <div class="navbar-brand"><span class="dot"></span> Kushki · MERC-PD</div>
         <div class="navbar-links">
             <a href="/">Dashboard</a>
-            <a href="/activos/">Activos</a>
-            <a href="/riesgos/">Riesgos</a>
-            <a href="/tratamientos/">Tratamientos</a>
+            {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}
+                <a href="/activos/">Activos</a>
+                <a href="/riesgos/">Riesgos</a>
+                <a href="/tratamientos/">Tratamientos</a>
+            {% endif %}
             <a href="/comunicacion/">Comunicación</a>
-            <a href="/usuarios/registrar/" class="active">Usuarios</a>
+            {% if request.session.usuario_rol == 'Administrador' %}
+                <a href="/usuarios/registrar/">Usuarios</a>
+            {% endif %}
         </div>
         <div style="display:flex; align-items:center; gap:12px; font-size:0.85rem; color: var(--color-text-muted);">
             <span>{{ request.session.usuario_nombre }} ({{ request.session.usuario_rol }})</span>
@@ -51,6 +55,8 @@
                     <label for="rol">Rol:</label>
                     <select id="rol" name="rol" required>
                         <option value="Arquitecto de Seguridad">Arquitecto de Seguridad</option>
+                        <option value="Custodio de Activo">Custodio de Activo</option>
+                        <option value="Auditor">Auditor</option>
                         <option value="Administrador">Administrador</option>
                     </select>
                 </div>

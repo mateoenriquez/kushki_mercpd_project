@@ -11,9 +11,11 @@
         <div class="navbar-brand"><span class="dot"></span> Kushki · MERC-PD</div>
         <div class="navbar-links">
             <a href="/">Dashboard</a>
-            <a href="/activos/">Activos</a>
-            <a href="/riesgos/">Riesgos</a>
-            <a href="/tratamientos/">Tratamientos</a>
+            {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}
+                <a href="/activos/">Activos</a>
+                <a href="/riesgos/">Riesgos</a>
+                <a href="/tratamientos/">Tratamientos</a>
+            {% endif %}
             <a href="/comunicacion/">Comunicación</a>
             {% if request.session.usuario_rol == 'Administrador' %}
                 <a href="/usuarios/registrar/">Usuarios</a>
@@ -24,24 +26,21 @@
             <a href="/logout/" style="color: var(--color-danger); text-decoration:none; font-weight:600;">Cerrar sesión</a>
         </div>
     </nav>
-
     <div class="page">
         <div class="page-header">
             <h2>Comunicación, Consulta y Reportes</h2>
             <p>Registra observaciones o recomendaciones por escenario y descarga el reporte consolidado.</p>
         </div>
-
         <div class="container">
+        {% if request.session.usuario_rol != 'Auditor' %}
         <form id="form-comunicacion">
             <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-
             <div class="form-group">
                 <label for="escenario_id">Escenario de Riesgo:</label>
                 <select id="escenario_id" name="escenario_id" required>
                     <option value="" disabled selected>Cargando escenarios...</option>
                 </select>
             </div>
-
             <div class="form-group">
                 <label for="tipo">Tipo:</label>
                 <select id="tipo" name="tipo" required>
@@ -49,23 +48,21 @@
                     <option value="Recomendacion">Recomendación</option>
                 </select>
             </div>
-
             <div class="form-group">
                 <label for="contenido">Contenido:</label>
                 <input type="text" id="contenido" name="contenido" required placeholder="Ej. Se recomienda renovar la póliza cibernética antes de Q4...">
             </div>
-
             <button type="submit">Registrar</button>
         </form>
         <div id="resultado-comunicacion" class="alert hidden"></div>
-
+        {% endif %}
         <hr style="margin: 28px 0; border: none; border-top: 1px solid var(--color-border);">
-
         <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 14px;">
             <h3 style="margin:0;">Historial de Comunicaciones</h3>
-            <a href="/api/reportes/csv/"><button type="button">Descargar Reporte (CSV)</button></a>
+            {% if request.session.usuario_rol != 'Custodio de Activo' %}
+                <a href="/api/reportes/csv/"><button type="button">Descargar Reporte (CSV)</button></a>
+            {% endif %}
         </div>
-
         <table id="tabla-comunicaciones">
             <thead>
                 <tr><th>Fecha</th><th>Tipo</th><th>Contenido</th><th>Usuario</th></tr>
