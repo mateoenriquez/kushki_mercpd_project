@@ -82,6 +82,9 @@ function cargarKpisYGraficos() {
         .then(data => {
             // --- Tarjetas de KPIs ---
             const kpiContenedor = document.getElementById('kpi-cards');
+            const mttmGlobal = data.mttm.global_dias;
+            const mttmTexto = mttmGlobal !== null ? `${mttmGlobal.toFixed(2)} días` : 'Sin datos';
+
             kpiContenedor.innerHTML = `
                 <div class="card-riesgo" style="flex-direction:column; align-items:flex-start;">
                     <p style="margin:0; font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase;">Total de Riesgos</p>
@@ -99,7 +102,51 @@ function cargarKpisYGraficos() {
                     <p style="margin:0; font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase;">Escenarios con Plazo Vencido</p>
                     <h3 style="margin:4px 0 0 0; color: ${data.sla.vencidos > 0 ? 'var(--color-danger)' : 'var(--color-success)'};">${data.sla.vencidos}</h3>
                 </div>
+                <div class="card-riesgo" style="flex-direction:column; align-items:flex-start;">
+                    <p style="margin:0; font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase;">Tiempo Medio de Mitigación (MTTM)</p>
+                    <h3 style="margin:4px 0 0 0;">${mttmTexto}</h3>
+                </div>
             `;
+
+            // --- Tabla de cumplimiento de MTTM por nivel de riesgo (Sección 7.3) ---
+            const mttmDetalle = document.getElementById('mttm-detalle');
+            if (mttmDetalle) {
+                const niveles = ['Critico', 'Alto', 'Medio', 'Bajo'];
+                const etiquetas = { Critico: 'Crítico', Alto: 'Alto', Medio: 'Medio', Bajo: 'Bajo' };
+
+                let filas = '';
+                niveles.forEach(nivel => {
+                    const info = data.mttm.por_nivel[nivel];
+                    const promedio = info.promedio_dias !== null ? `${info.promedio_dias.toFixed(2)} días` : '—';
+                    const meta = info.meta_dias !== null ? `≤ ${info.meta_dias} días` : 'No aplica';
+                    let estado = '<span style="color: var(--color-text-muted);">Sin muestras</span>';
+                    if (info.promedio_dias !== null && info.meta_dias !== null) {
+                        estado = info.cumple_meta
+                            ? '<span class="badge riesgo-bajo">Cumple</span>'
+                            : '<span class="badge riesgo-critico">No cumple</span>';
+                    } else if (info.promedio_dias !== null) {
+                        estado = '<span style="color: var(--color-text-muted);">Sin meta definida</span>';
+                    }
+                    filas += `
+                        <tr>
+                            <td>${etiquetas[nivel]}</td>
+                            <td>${promedio}</td>
+                            <td>${meta}</td>
+                            <td>${estado}</td>
+                            <td>${info.muestras}</td>
+                        </tr>`;
+                });
+
+                mttmDetalle.innerHTML = `
+                    <h3 style="margin-top:0;">Cumplimiento de Tiempos de Mitigación (MTTM)</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Nivel</th><th>MTTM Real</th><th>Meta (Sección 6.3/7.3)</th><th>Estado</th><th>Escenarios tratados</th></tr>
+                        </thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                `;
+            }
 
             // --- Gráfico 1: Distribución de riesgos por nivel (dona) ---
             const zonas = data.distribucion_zonas;

@@ -494,8 +494,9 @@ def api_dashboard_kpis(request):
     Alimenta los gráficos del dashboard con los KPIs de monitoreo continuo
     de la metodología MERC-PD (Sección 7.3): distribución de riesgos por
     zona del semáforo, riesgo acumulado por categoría de activo, Índice de
-    Riesgo Residual Promedio (IRRP), % de riesgos críticos sin control y
-    cumplimiento de SLA (escenarios vencidos vs. en plazo).
+    Riesgo Residual Promedio (IRRP), % de riesgos críticos sin control,
+    cumplimiento de SLA (escenarios vencidos vs. en plazo) y Tiempo Medio
+    de Mitigación (MTTM) comparado contra las metas de la metodología.
     """
     escenarios = EscenarioRiesgo.objects.select_related('activo').prefetch_related(
         Prefetch('tratamiento_set', queryset=Tratamiento.objects.order_by('-fechatratamiento'), to_attr='tratamientos_ordenados')
@@ -513,6 +514,12 @@ def api_dashboard_kpis(request):
     en_plazo = 0
     suma_riesgo = 0.0
     total = 0
+
+    # MTTM (Tiempo Medio de Mitigación) - Sección 7.3 de la metodología.
+    # Se agrupa por el nivel de riesgo INHERENTE (el detectado al momento
+    # de la evaluación), porque las metas de tiempo de respuesta de la
+    # Sección 6.3 / 7.3 se definen sobre ese nivel, no sobre el residual.
+    dias_por_nivel = {'Bajo': [], 'Medio': [], 'Alto': [], 'Critico': []}
 
     for esc in escenarios:
         ultimo = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
@@ -536,8 +543,35 @@ def api_dashboard_kpis(request):
             else:
                 en_plazo += 1
 
+        # Un escenario aporta al MTTM solo si YA fue tratado (tiene fecha
+        # de cierre). Se mide desde la detección (FechaEvaluacion) hasta
+        # el registro del tratamiento (FechaTratamiento).
+        if ultimo:
+            dias_mitigacion = (ultimo.fechatratamiento - esc.fechaevaluacion).total_seconds() / 86400
+            nivel_inherente = nivel_de_riesgo(esc.riesgototal)
+            dias_por_nivel[nivel_inherente].append(dias_mitigacion)
+
     irrp = round(suma_riesgo / total, 3) if total else 0.0
     pct_criticos_sin_control = round((criticos_sin_control / criticos_totales * 100), 1) if criticos_totales else 0.0
+
+    # Metas de MTTM por nivel (Sección 6.3 / 7.3 de la metodología MERC-PD).
+    # Crítico: 72 horas = 3 días de corrección definitiva.
+    metas_mttm_dias = {'Critico': 3, 'Alto': 15, 'Medio': 30}
+
+    mttm_por_nivel = {}
+    todos_los_dias = []
+    for nivel, lista_dias in dias_por_nivel.items():
+        promedio = round(sum(lista_dias) / len(lista_dias), 2) if lista_dias else None
+        todos_los_dias.extend(lista_dias)
+        meta = metas_mttm_dias.get(nivel)
+        mttm_por_nivel[nivel] = {
+            'promedio_dias': promedio,
+            'meta_dias': meta,
+            'cumple_meta': (promedio is not None and meta is not None and promedio <= meta),
+            'muestras': len(lista_dias),
+        }
+
+    mttm_global_dias = round(sum(todos_los_dias) / len(todos_los_dias), 2) if todos_los_dias else None
 
     return JsonResponse({
         'distribucion_zonas': zonas,
@@ -545,6 +579,10 @@ def api_dashboard_kpis(request):
         'irrp': irrp,
         'pct_criticos_sin_control': pct_criticos_sin_control,
         'sla': {'vencidos': vencidos, 'en_plazo': en_plazo},
+        'mttm': {
+            'global_dias': mttm_global_dias,
+            'por_nivel': mttm_por_nivel,
+        },
         'total_escenarios': total,
     })
 
