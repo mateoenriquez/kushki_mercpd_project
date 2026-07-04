@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MERC-PD | Registro de Activos Kushki</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Registro y Valoración de Activos</h2>
+        <form id="form-activo">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            
+            <div class="form-group">
+                <label for="nombre">Nombre del Activo:</label>
+                <input type="text" id="nombre" name="nombre" required placeholder="Ej. Servidor Core Transaccional">
+            </div>
+
+            <div class="form-group">
+                <label for="tipo">Tipo de Activo:</label>
+                <select id="tipo" name="tipo" required>
+                    <option value="Informacion">Información</option>
+                    <option value="Software">Software</option>
+                    <option value="Hardware">Hardware</option>
+                    <option value="Servicios">Servicios</option>
+                    <option value="Personas">Personas</option>
+                    <option value="Reputacion">Reputación</option>
+                    <option value="Instalaciones">Instalaciones</option>
+                </select>
+            </div>
+
+            <fieldset>
+                <legend>Valoración CIA (Rango 1 a 3)</legend>
+                <div class="form-group">
+                    <label for="confidencialidad">Confidencialidad (C):</label>
+                    <input type="number" id="confidencialidad" name="confidencialidad" min="1" max="3" required>
+                </div>
+                <div class="form-group">
+                    <label for="integridad">Integridad (I):</label>
+                    <input type="number" id="integridad" name="integridad" min="1" max="3" required>
+                </div>
+                <div class="form-group">
+                    <label for="disponibilidad">Disponibilidad (D):</label>
+                    <input type="number" id="disponibilidad" name="disponibilidad" min="1" max="3" required>
+                </div>
+            </fieldset>
+
+            <button type="submit" id="btn-registrar">Registrar Activo</button>
+        </form>
+        <div id="resultado-va" class="alert hidden"></div>
+    </div>
+    <script src="/static/js/activos.js"></script>
+</body>
+</html>

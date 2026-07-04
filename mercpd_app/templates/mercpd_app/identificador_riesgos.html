@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MERC-PD | Identificación de Riesgos</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Identificación de Riesgos (Amenazas vs Vulnerabilidades)</h2>
+        <form id="form-riesgo">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            
+            <div class="form-group">
+                <label for="activo_id">Seleccionar Activo:</label>
+                <select id="activo_id" name="activo_id" required>
+                    </select>
+            </div>
+
+            <div class="form-group">
+                <label for="amenaza">Amenaza Identificada:</label>
+                <select id="amenaza" name="amenaza" required>
+                    <option value="Ransomware">Ataque de Ransomware (Externa)</option>
+                    <option value="Inyeccion_API">Inyección en APIs (Externa)</option>
+                    <option value="Phishing">Phishing Avanzado (Externa)</option>
+                    <option value="Fuga_Interna">Fuga de información maliciosa (Interna)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="vulnerabilidad">Vulnerabilidad Asociada:</label>
+                <select id="vulnerabilidad" name="vulnerabilidad" required>
+                    <option value="Falta_Parches">Ausencia de parches de seguridad (Tecnológica)</option>
+                    <option value="Cifrado_Debil">Cifrado débil en reposo/tránsito (Tecnológica)</option>
+                    <option value="Falta_Cultura">Falta de cultura en ciberseguridad (Organizacional)</option>
+                    <option value="Sin_RBAC">Deficiencia en control de accesos RBAC (Procesos)</option>
+                </select>
+            </div>
+
+            <fieldset>
+                <legend>Parámetros para Cálculo de Riesgo</legend>
+                <div class="form-group">
+                    <label for="probabilidad">Probabilidad (1 al 3):</label>
+                    <input type="number" id="probabilidad" name="probabilidad" min="1" max="3" required>
+                </div>
+                <div class="form-group">
+                    <label for="impacto_operativo">Impacto Operativo (1 al 3):</label>
+                    <input type="number" id="impacto_operativo" name="impacto_operativo" min="1" max="3" required>
+                </div>
+                <div class="form-group">
+                    <label for="impacto_spdp">Impacto Protección Datos SPDP (1 al 3):</label>
+                    <input type="number" id="impacto_spdp" name="impacto_spdp" min="1" max="3" required>
+                </div>
+                <div class="form-group">
+                    <label for="impacto_financiero">Impacto Financiero/Legal (1 al 3):</label>
+                    <input type="number" id="impacto_financiero" name="impacto_financiero" min="1" max="3" required>
+                </div>
+            </fieldset>
+
+            <button type="submit">Evaluar y Guardar Riesgo</button>
+        </form>
+        <div id="resultado-riesgo" class="alert hidden"></div>
+    </div>
+    <script src="/static/js/riesgos.js"></script>
+</body>
+</html>
