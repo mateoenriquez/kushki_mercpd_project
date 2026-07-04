@@ -12,7 +12,16 @@
         <div class="navbar-links">
             <a href="/">Dashboard</a>
             <a href="/activos/">Activos</a>
-            <a href="/riesgos/" class="active">Riesgos</a>
+            <a href="/riesgos/">Riesgos</a>
+            <a href="/tratamientos/">Tratamientos</a>
+            <a href="/comunicacion/">Comunicación</a>
+            {% if request.session.usuario_rol == 'Administrador' %}
+                <a href="/usuarios/registrar/">Usuarios</a>
+            {% endif %}
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; font-size:0.85rem; color: var(--color-text-muted);">
+            <span>{{ request.session.usuario_nombre }} ({{ request.session.usuario_rol }})</span>
+            <a href="/logout/" style="color: var(--color-danger); text-decoration:none; font-weight:600;">Cerrar sesión</a>
         </div>
     </nav>
 

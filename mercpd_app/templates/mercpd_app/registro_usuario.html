@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MERC-PD | Registrar Usuario</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><span class="dot"></span> Kushki · MERC-PD</div>
+        <div class="navbar-links">
+            <a href="/">Dashboard</a>
+            <a href="/activos/">Activos</a>
+            <a href="/riesgos/">Riesgos</a>
+            <a href="/tratamientos/">Tratamientos</a>
+            <a href="/comunicacion/">Comunicación</a>
+            <a href="/usuarios/registrar/" class="active">Usuarios</a>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; font-size:0.85rem; color: var(--color-text-muted);">
+            <span>{{ request.session.usuario_nombre }} ({{ request.session.usuario_rol }})</span>
+            <a href="/logout/" style="color: var(--color-danger); text-decoration:none; font-weight:600;">Cerrar sesión</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h2>Registrar Nuevo Usuario</h2>
+            <p>Acceso exclusivo para el rol Administrador. Define el nivel de acceso del nuevo usuario.</p>
+        </div>
+
+        <div class="container" style="max-width: 500px;">
+            {% if error %}
+                <div class="alert" style="background-color: var(--color-danger-bg); color: var(--color-danger); border-color: var(--color-danger);">{{ error }}</div>
+            {% endif %}
+            {% if success %}
+                <div class="alert" style="background-color: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success);">{{ success }}</div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="nombre">Nombre completo:</label>
+                    <input type="text" id="nombre" name="nombre" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Correo:</label>
+                    <input type="text" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="rol">Rol:</label>
+                    <select id="rol" name="rol" required>
+                        <option value="Arquitecto de Seguridad">Arquitecto de Seguridad</option>
+                        <option value="Administrador">Administrador</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña temporal:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" style="width:100%;">Crear Usuario</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

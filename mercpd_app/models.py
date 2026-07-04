@@ -6,6 +6,7 @@ class Usuario(models.Model):
     nombre = models.CharField(max_length=100, db_column='Nombre')
     rol = models.CharField(max_length=50, db_column='Rol')
     email = models.CharField(max_length=100, unique=True, db_column='Email')
+    passwordhash = models.CharField(max_length=255, db_column='PasswordHash', blank=True, null=True)
     fechacreacion = models.DateTimeField(auto_now_add=True, db_column='FechaCreacion')
 
     class Meta:
@@ -89,3 +90,19 @@ class Tratamiento(models.Model):
     class Meta:
         managed = False
         db_table = '[mercpd].[Tratamientos]'
+        
+class Comunicacion(models.Model):
+    TIPO_CHOICES = [
+        ('Observacion', 'Observación'),
+        ('Recomendacion', 'Recomendación'),
+    ]
+    comunicacionid = models.AutoField(primary_key=True, db_column='ComunicacionID')
+    escenario = models.ForeignKey(EscenarioRiesgo, models.DO_NOTHING, db_column='EscenarioID')
+    usuario = models.ForeignKey(Usuario, models.DO_NOTHING, db_column='UsuarioID', blank=True, null=True)
+    tipo = models.CharField(max_length=20, db_column='Tipo', choices=TIPO_CHOICES)
+    contenido = models.CharField(max_length=1000, db_column='Contenido')
+    fechacomunicacion = models.DateTimeField(auto_now_add=True, db_column='FechaComunicacion')
+
+    class Meta:
+        managed = False
+        db_table = '[mercpd].[Comunicaciones]'

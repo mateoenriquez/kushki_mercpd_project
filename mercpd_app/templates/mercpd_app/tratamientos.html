@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MERC-PD | Tratamiento del Riesgo</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><span class="dot"></span> Kushki · MERC-PD</div>
+        <div class="navbar-links">
+            <a href="/">Dashboard</a>
+            <a href="/activos/">Activos</a>
+            <a href="/riesgos/">Riesgos</a>
+            <a href="/tratamientos/">Tratamientos</a>
+            <a href="/comunicacion/">Comunicación</a>
+            {% if request.session.usuario_rol == 'Administrador' %}
+                <a href="/usuarios/registrar/">Usuarios</a>
+            {% endif %}
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; font-size:0.85rem; color: var(--color-text-muted);">
+            <span>{{ request.session.usuario_nombre }} ({{ request.session.usuario_rol }})</span>
+            <a href="/logout/" style="color: var(--color-danger); text-decoration:none; font-weight:600;">Cerrar sesión</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h2>Tratamiento del Riesgo</h2>
+            <p>Selecciona una estrategia de respuesta (ISO/IEC 27002:2022) y calcula el Riesgo Residual.</p>
+        </div>
+
+        <div class="container">
+        <form id="form-tratamiento">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+            <div class="form-group">
+                <label for="escenario_id">Escenario de Riesgo:</label>
+                <select id="escenario_id" name="escenario_id" required>
+                    <option value="" disabled selected>Cargando escenarios...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="opcion_tratamiento">Opción de Tratamiento:</label>
+                <select id="opcion_tratamiento" name="opcion_tratamiento" required>
+                    <option value="" disabled selected>Seleccione una opción...</option>
+                    <option value="Mitigar">Mitigar</option>
+                    <option value="Transferir">Transferir</option>
+                    <option value="Evitar">Evitar</option>
+                    <option value="Aceptar">Aceptar</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="control_aplicado">Control Aplicado (referencia ISO/IEC 27002:2022):</label>
+                <input type="text" id="control_aplicado" name="control_aplicado" required placeholder="Ej. Despliegue de parches, cifrado AES-256, contratación de póliza cibernética...">
+            </div>
+
+            <div class="form-group">
+                <label for="eficacia_control">Eficacia del Control (0.00 a 1.00):</label>
+                <input type="number" id="eficacia_control" name="eficacia_control" min="0" max="1" step="0.01" required>
+            </div>
+
+            <button type="submit">Registrar Tratamiento</button>
+        </form>
+        <div id="resultado-tratamiento" class="alert hidden"></div>
+        </div>
+    </div>
+    <script src="/static/js/tratamientos.js"></script>
+</body>
+</html>

@@ -1,14 +1,15 @@
 from pathlib import Path
+import os
 
 # 1. Rutas base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 2. Llave de seguridad (Requerida por Django para arrancar)
-SECRET_KEY = 'django-insecure-kushki-mercpd-super-secret-key-2026'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-kushki-mercpd-super-secret-key-2026')
 
 # 3. Modo de depuración (True para desarrollo local)
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
 # 4. Aplicaciones instaladas (Aquí registramos tu app 'mercpd_app')
 INSTALLED_APPS = [

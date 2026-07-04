@@ -34,18 +34,21 @@ function cargarDashboard() {
 
                 const card = document.createElement('div');
                 card.className = 'card-riesgo';
-                card.innerHTML = `
-                    <div>
-                        <h4 style="margin:0 0 5px 0;">Activo: ${riesgo.activo_nombre}</h4>
-                        <p style="margin:0; color:#555;">Amenaza: ${riesgo.amenaza} | Vuln: ${riesgo.vulnerabilidad}</p>
-                        <p style="margin:5px 0 0 0; font-size:0.9em;">
-                            VA: ${riesgo.va} | Probabilidad: ${riesgo.probabilidad} | Impacto Final: ${riesgo.impacto_final.toFixed(2)}
-                        </p>
-                    </div>
-                    <div class="semaforo ${claseColor}">
-                        ${etiquetaRiesgo} (${riesgo.puntaje_total.toFixed(2)})
-                    </div>
-                `;
+                    card.innerHTML = `
+                        <div>
+                            <h4 style="margin:0 0 5px 0;">Activo: ${riesgo.activo_nombre}</h4>
+                            <p style="margin:0; color:#555;">Amenaza: ${riesgo.amenaza} | Vuln: ${riesgo.vulnerabilidad}</p>
+                            <p style="margin:5px 0 0 0; font-size:0.9em;">
+                                VA: ${riesgo.va} | Probabilidad: ${riesgo.probabilidad} | Riesgo Inherente: ${riesgo.riesgo_inherente.toFixed(2)}
+                            </p>
+                            <p style="margin:2px 0 0 0; font-size:0.85em; color:#555;">
+                                Estado: <strong>${riesgo.estado_tratamiento}</strong>
+                            </p>
+                        </div>
+                        <div class="semaforo ${claseColor}">
+                            ${etiquetaRiesgo} (Riesgo Actual: ${riesgo.puntaje_total.toFixed(2)})
+                        </div>
+                    `;
                 contenedor.appendChild(card);
             });
         })
