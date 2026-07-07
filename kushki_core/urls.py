@@ -49,4 +49,7 @@ urlpatterns = [
     path('api/comunicaciones/registrar/', views.api_comunicaciones_registrar, name='api_comunicaciones_registrar'),
     path('api/comunicaciones/lista/', views.api_comunicaciones_lista, name='api_comunicaciones_lista'),
     path('api/reportes/csv/', views.api_reporte_csv, name='api_reporte_csv'),
+    
+    path('auditoria/', views.vista_auditoria, name='auditoria'),
+    path('api/auditoria/lista/', views.api_auditoria_lista, name='api_auditoria_lista'),
 ]

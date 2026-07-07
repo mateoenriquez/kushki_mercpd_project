@@ -15,7 +15,7 @@ from django.contrib.auth.hashers import make_password, check_password
 
 from .models import (
     Activo, Amenaza, Vulnerabilidad, EscenarioRiesgo, Usuario,
-    Tratamiento, Comunicacion,
+    Tratamiento, Comunicacion, AuditoriaCambio
 )
 
 # ============================================================
@@ -165,6 +165,23 @@ def nivel_de_riesgo(puntaje):
         return 'Medio'
     return 'Bajo'
 
+def registrar_auditoria(request, tabla, registro_id, accion, detalle=''):
+    """
+    Bitácora de auditoría (Extra de Fase 5). Nunca debe romper el flujo
+    principal: si falla el registro de auditoría, se ignora silenciosamente
+    y la operación original (ya confirmada) sigue su curso normal.
+    """
+    try:
+        AuditoriaCambio.objects.create(
+            tablaafectada=tabla,
+            registroid=registro_id,
+            accion=accion,
+            usuario_id=request.session.get('usuario_id'),
+            detalle=detalle,
+        )
+    except Exception:
+        pass
+
 
 # ============================================================
 # VISTAS DEL FRONTEND (RENDERIZADO DE PLANTILLAS HTML)
@@ -303,6 +320,8 @@ def api_activos_registrar(request):
             valoractivo=va,
             custodio_id=custodio_id,
         )
+        
+        registrar_auditoria(request, 'Activos', activo.activoid, 'CREAR', f'Activo "{nombre}" registrado (VA={va}).')
 
         return JsonResponse({
             'success': True,
@@ -402,6 +421,8 @@ def api_riesgos_evaluar(request):
             riesgototal=riesgo_total_dec,
             fechalimitetratamiento=fecha_limite,
         )
+        
+        registrar_auditoria(request, 'EscenariosRiesgo', escenario.escenarioid, 'CREAR', f'Riesgo evaluado sobre "{activo.nombre}" ({amenaza.nombre} x {vulnerabilidad.nombre}), nivel {nivel_de_riesgo(riesgo_total_dec)}.')
 
         mensaje_piso = (
             'Se aplicó el Factor Suelo: el activo tiene VA >= 2.5, por lo que el '
@@ -523,7 +544,11 @@ def api_dashboard_kpis(request):
     # Sección 6.3 / 7.3 se definen sobre ese nivel, no sobre el residual.
     dias_por_nivel = {'Bajo': [], 'Medio': [], 'Alto': [], 'Critico': []}
 
+    matriz_calor = {f"{p}-{i}": 0 for p in (1, 2, 3) for i in (1, 2, 3)}
+    
     for esc in escenarios:
+        clave_matriz = f"{esc.probabilidad}-{esc.impactobase}"
+        matriz_calor[clave_matriz] = matriz_calor.get(clave_matriz, 0) + 1
         ultimo = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
         riesgo_actual = float(ultimo.riesgoresidual) if ultimo else float(esc.riesgototal)
         suma_riesgo += riesgo_actual
@@ -581,6 +606,7 @@ def api_dashboard_kpis(request):
         'irrp': irrp,
         'pct_criticos_sin_control': pct_criticos_sin_control,
         'sla': {'vencidos': vencidos, 'en_plazo': en_plazo},
+        'matriz_calor': matriz_calor,
         'mttm': {
             'global_dias': mttm_global_dias,
             'por_nivel': mttm_por_nivel,
@@ -620,6 +646,7 @@ def vista_registro_usuario(request):
             rol=rol,
             passwordhash=make_password(password),
         )
+        registrar_auditoria(request, 'Usuarios', None, 'CREAR', f'Usuario "{nombre}" ({rol}) creado.')
         return render(request, 'mercpd_app/registro_usuario.html', {'success': f'Usuario "{nombre}" creado exitosamente.'})
 
     return render(request, 'mercpd_app/registro_usuario.html')
@@ -722,6 +749,8 @@ def api_tratamientos_registrar(request):
             fechalimitecierre=escenario.fechalimitetratamiento,
         )
         tratamiento.refresh_from_db()  # trae el RiesgoResidual calculado por el trigger
+        
+        registrar_auditoria(request, 'Tratamientos', tratamiento.tratamientoid, 'CREAR', f'Tratamiento "{opcion}" aplicado al escenario #{escenario.escenarioid}.')
 
         return JsonResponse({
             'success': True,
@@ -774,6 +803,8 @@ def api_comunicaciones_registrar(request):
             tipo=tipo,
             contenido=contenido,
         )
+        
+        registrar_auditoria(request, 'Comunicaciones', comunicacion.comunicacionid, 'CREAR', f'{tipo} registrada sobre escenario #{escenario_id}.')
 
         return JsonResponse({'success': True, 'comunicacion_id': comunicacion.comunicacionid})
 
@@ -831,3 +862,27 @@ def api_reporte_csv(request):
     writer.writerows(filas)
 
     return response
+
+@rol_requerido('Administrador', 'Auditor')
+def vista_auditoria(request):
+    """Renderiza la Bitácora de Auditoría (Extra de Fase 5)."""
+    return render(request, 'mercpd_app/auditoria.html')
+
+
+@rol_requerido('Administrador', 'Auditor')
+def api_auditoria_lista(request):
+    """Devuelve las últimas 200 acciones registradas en el sistema."""
+    registros = AuditoriaCambio.objects.select_related('usuario').order_by('-fechaaccion')[:200]
+    data = [
+        {
+            'id': r.auditoriaid,
+            'tabla': r.tablaafectada,
+            'registro_id': r.registroid,
+            'accion': r.accion,
+            'usuario': r.usuario.nombre if r.usuario else 'Sistema',
+            'detalle': r.detalle,
+            'fecha': r.fechaaccion.strftime('%Y-%m-%d %H:%M'),
+        }
+        for r in registros
+    ]
+    return JsonResponse({'auditoria': data})

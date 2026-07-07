@@ -377,3 +377,260 @@ th {
         align-items: flex-start;
     }
 }
+
+/* ============================================================
+   ARGOS · Paleta de marca + Sidebar + Extras (Fase 5)
+   ============================================================ */
+
+:root {
+    --color-primary: #146C94;
+    --color-primary-hover: #0B2447;
+    --color-primary-soft: #E6F6FB;
+
+    /* Paleta de riesgo con 4 niveles bien diferenciados */
+    --color-risk-bajo: #16A34A;
+    --color-risk-medio: #F59E0B;
+    --color-risk-alto: #EA580C;
+    --color-risk-critico: #B91C1C;
+
+    --sidebar-width: 264px;
+    --sidebar-width-collapsed: 76px;
+    --sidebar-bg: #0B2447;
+    --sidebar-bg-hover: #12315E;
+    --sidebar-text: #B9C6D6;
+    --sidebar-text-active: #FFFFFF;
+    --sidebar-border: #1B3A63;
+}
+
+/* Semáforo con 4 colores distintos: Medio y Alto ya NO se confunden */
+.bg-verde { background-color: var(--color-risk-bajo); }
+.bg-amarillo { background-color: var(--color-risk-medio); color: #ffffff; }
+.bg-naranja { background-color: var(--color-risk-alto); color: #ffffff; }
+.bg-rojo { background-color: var(--color-risk-critico); }
+
+.riesgo-bajo { background-color: var(--color-risk-bajo); }
+.riesgo-medio { background-color: var(--color-risk-medio); color: #ffffff; }
+.riesgo-alto { background-color: var(--color-risk-alto); color: #ffffff; }
+.riesgo-critico { background-color: var(--color-risk-critico); }
+
+/* ---------- Layout general con sidebar ---------- */
+.main-content {
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.25s ease;
+    min-height: 100vh;
+}
+body.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-width-collapsed);
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: var(--sidebar-width);
+    background-color: var(--sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.25s ease;
+    z-index: 100;
+    overflow: hidden;
+}
+body.sidebar-collapsed .sidebar { width: var(--sidebar-width-collapsed); }
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px 12px;
+    border-bottom: 1px solid var(--sidebar-border);
+    min-height: 72px;
+}
+.sidebar-header img.sidebar-logo { height: 34px; width: auto; flex-shrink: 0; }
+.sidebar-header img.sidebar-title-img { height: 26px; width: auto; transition: opacity 0.2s ease; }
+body.sidebar-collapsed .sidebar-header img.sidebar-title-img { display: none; }
+
+.sidebar-toggle {
+    position: absolute;
+    top: 22px;
+    right: -14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    border: 2px solid var(--sidebar-bg);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: transform 0.25s ease;
+}
+body.sidebar-collapsed .sidebar-toggle { transform: rotate(180deg); }
+
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 14px 10px; }
+
+.nav-item-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    background: none;
+    border: none;
+    color: var(--sidebar-text);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.nav-item-btn:hover, .nav-item-btn.active { background-color: var(--sidebar-bg-hover); color: var(--sidebar-text-active); }
+.nav-item-btn .nav-icon { width: 18px; text-align: center; flex-shrink: 0; }
+.nav-item-btn .nav-label { flex: 1; text-align: left; }
+.nav-item-btn .nav-chevron { transition: transform 0.2s ease; font-size: 0.7rem; }
+.nav-item-btn.open .nav-chevron { transform: rotate(90deg); }
+body.sidebar-collapsed .nav-label,
+body.sidebar-collapsed .nav-chevron { display: none; }
+
+.submenu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+.submenu.open { max-height: 300px; }
+.submenu a {
+    display: block;
+    padding: 9px 12px 9px 44px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+}
+.submenu a:hover, .submenu a.active { background-color: var(--sidebar-bg-hover); color: var(--sidebar-text-active); }
+body.sidebar-collapsed .submenu { display: none; }
+
+.sidebar-footer {
+    border-top: 1px solid var(--sidebar-border);
+    padding: 14px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sidebar-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; background: var(--sidebar-bg-hover); }
+.sidebar-user-info { overflow: hidden; }
+body.sidebar-collapsed .sidebar-user-info { display: none; }
+.sidebar-user-name { color: #fff; font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rol-badge {
+    display: inline-block;
+    margin-top: 3px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+}
+.rol-administrador { background-color: #19A7CE; }
+.rol-arquitecto-de-seguridad { background-color: #7C3AED; }
+.rol-custodio-de-activo { background-color: #0D9488; }
+.rol-auditor { background-color: #D97706; }
+.sidebar-logout { color: #F87171; text-decoration: none; font-size: 1rem; margin-left: auto; }
+body.sidebar-collapsed .sidebar-logout { display: none; }
+
+/* ---------- Login (imagen top-left + título imagen) ---------- */
+.login-brand-corner { position: fixed; top: 20px; left: 24px; height: 36px; }
+
+/* ---------- Botón icono "refrescar" ---------- */
+.btn-icon-refresh {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: none;
+    background-color: var(--color-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.4s ease;
+    flex-shrink: 0;
+}
+.btn-icon-refresh:hover { background-color: var(--color-primary-hover); }
+.btn-icon-refresh.girando svg { animation: girar 0.6s linear; }
+@keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Contenedores anchos, solo para el Dashboard */
+.page-wide { max-width: 1400px; }
+.container-wide { max-width: 1400px; }
+
+/* KPIs y gráficos: se acomodan en una fila si el ancho alcanza,
+   y solo bajan de fila si el contenedor de verdad no alcanza
+   (nunca generan scroll horizontal). */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px;
+}
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+}
+
+/* ---------- Tabla de riesgos del dashboard ---------- */
+.tabla-riesgos-wrapper { 
+    width: 100%; 
+    overflow-x: auto; 
+    margin-top: 15px;
+}
+.tabla-riesgos-wrapper table { 
+    width: 100%; 
+    min-width: 1100px; /* Esto evita que se aplaste */
+    border-collapse: collapse; 
+}
+.tabla-riesgos-wrapper th, 
+.tabla-riesgos-wrapper td {
+    padding: 14px 18px; /* Esto le da respiro al texto */
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--color-border);
+}
+.tabla-riesgos-wrapper th {
+    white-space: nowrap; /* Evita que los títulos bajen a la siguiente línea */
+    background-color: var(--color-bg); 
+}
+.btn-tratar {
+    display: inline-block;
+    padding: 7px 14px;
+    background-color: var(--color-primary);
+    color: #fff !important;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.btn-tratar:hover { background-color: var(--color-primary-hover); }
+.badge-vencido { background-color: var(--color-risk-critico); color: #fff; padding: 3px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.badge-en-plazo { color: var(--color-text-muted); font-size: 0.8rem; }
+
+/* ---------- MTTM: comparación visual ---------- */
+.mttm-fila { margin-bottom: 14px; }
+.mttm-fila-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+.mttm-barra-fondo { background: var(--color-bg); border-radius: 999px; height: 10px; overflow: hidden; }
+.mttm-barra-relleno { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+
+/* ---------- Matriz de calor 3x3 ---------- */
+.matriz-calor { display: grid; grid-template-columns: 90px repeat(3, 1fr); gap: 4px; max-width: 480px; margin: 0 auto; }
+.matriz-celda { display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: var(--radius-sm); padding: 14px 6px; color: #fff; font-weight: 700; min-height: 64px; }
+.matriz-eje { font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; display: flex; align-items: center; justify-content: center; text-align: center; }
+</parameter>

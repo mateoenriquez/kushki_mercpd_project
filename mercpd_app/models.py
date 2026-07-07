@@ -116,3 +116,16 @@ class Comunicacion(models.Model):
     class Meta:
         managed = False
         db_table = '[mercpd].[Comunicaciones]'
+        
+class AuditoriaCambio(models.Model):
+    auditoriaid = models.AutoField(primary_key=True, db_column='AuditoriaID')
+    tablaafectada = models.CharField(max_length=50, db_column='TablaAfectada')
+    registroid = models.IntegerField(db_column='RegistroID', blank=True, null=True)
+    accion = models.CharField(max_length=20, db_column='Accion')
+    usuario = models.ForeignKey(Usuario, models.DO_NOTHING, db_column='UsuarioID', blank=True, null=True)
+    detalle = models.CharField(max_length=500, db_column='Detalle', blank=True, null=True)
+    fechaaccion = models.DateTimeField(auto_now_add=True, db_column='FechaAccion')
+
+    class Meta:
+        managed = False
+        db_table = '[mercpd].[AuditoriaCambios]'

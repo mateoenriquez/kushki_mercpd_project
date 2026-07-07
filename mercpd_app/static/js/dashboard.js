@@ -1,104 +1,141 @@
 let chartZonas, chartCategoria, chartSla;
 
-function cargarDashboard() {
-    const contenedor = document.getElementById('contenedor-riesgos');
-    const btnActualizar = document.getElementById('btn-actualizar');
+function nivelYColorDe(puntaje) {
+    if (puntaje < 3.0) return { nivel: 'Bajo', clase: 'bg-verde', hex: '#16A34A' };
+    if (puntaje < 5.0) return { nivel: 'Medio', clase: 'bg-amarillo', hex: '#F59E0B' };
+    if (puntaje < 7.5) return { nivel: 'Alto', clase: 'bg-naranja', hex: '#EA580C' };
+    return { nivel: 'Crítico', clase: 'bg-rojo', hex: '#B91C1C' };
+}
 
-    // 1. Mostrar mensaje de carga y bloquear el botón para evitar múltiples clics
-    contenedor.innerHTML = '<p>Actualizando semáforos de riesgo...</p>';
-    btnActualizar.disabled = true;
-    btnActualizar.innerText = 'Cargando...';
+function cargarDashboard() {
+    const tbody = document.querySelector('#tabla-riesgos tbody');
 
     fetch('/api/riesgos/dashboard/')
         .then(response => response.json())
         .then(data => {
-            contenedor.innerHTML = '';
+            tbody.innerHTML = '';
 
             if (data.riesgos.length === 0) {
-                contenedor.innerHTML = '<p>No hay escenarios de riesgo registrados.</p>';
+                tbody.innerHTML = '<tr><td colspan="8">No hay escenarios de riesgo registrados.</td></tr>';
                 return;
             }
 
             data.riesgos.forEach(riesgo => {
-                let claseColor = '';
-                let etiquetaRiesgo = '';
+                const info = nivelYColorDe(riesgo.puntaje_total);
 
-                if (riesgo.puntaje_total < 3.0) {
-                    claseColor = 'bg-verde';
-                    etiquetaRiesgo = 'Bajo';
-                } else if (riesgo.puntaje_total >= 3.0 && riesgo.puntaje_total < 5.0) {
-                    claseColor = 'bg-amarillo';
-                    etiquetaRiesgo = 'Medio';
-                } else {
-                    claseColor = 'bg-rojo';
-                    etiquetaRiesgo = riesgo.puntaje_total >= 7.5 ? 'Crítico' : 'Alto';
-                }
-
-                // Badge de fechas / SLA (Sección 6.3 de la metodología MERC-PD)
-                let badgeSla = '';
+                let celdaPlazo = '<span class="badge-en-plazo">—</span>';
                 if (riesgo.estado_tratamiento === 'Sin Tratamiento' && riesgo.fecha_limite_tratamiento) {
-                    if (riesgo.vencido) {
-                        badgeSla = `<span style="color: var(--color-danger); font-weight:700;">⚠ Plazo vencido (límite: ${riesgo.fecha_limite_tratamiento})</span>`;
-                    } else {
-                        badgeSla = `<span style="color: var(--color-text-muted);">Plazo límite: ${riesgo.fecha_limite_tratamiento} (${riesgo.dias_restantes} días restantes)</span>`;
-                    }
+                    celdaPlazo = riesgo.vencido
+                        ? `<span class="badge-vencido">Vencido (${riesgo.fecha_limite_tratamiento})</span>`
+                        : `<span class="badge-en-plazo">${riesgo.fecha_limite_tratamiento} (${riesgo.dias_restantes} días)</span>`;
                 }
 
-                // Corrección #3: detalle del control aplicado y su eficacia,
-                // visible para cualquier rol que vea esta tarjeta (incluye
-                // al Custodio de Activo, que antes no tenía este dato).
-                let detalleControl = '';
-                if (riesgo.control_aplicado) {
-                    detalleControl = `<p style="margin:2px 0 0 0; font-size:0.8em; color:#555;">Control aplicado: <strong>${riesgo.control_aplicado}</strong> (eficacia: ${(riesgo.eficacia_control * 100).toFixed(0)}%)</p>`;
-                }
-
-                // Corrección #2: acción rápida "Tratar este riesgo →", solo
-                // visible para roles que pueden acceder a /tratamientos/
-                // (window.PUEDE_TRATAR se define en dashboard.html).
-                let accionRapida = '';
+                let celdaAccion = '—';
                 if (window.PUEDE_TRATAR && riesgo.estado_tratamiento === 'Sin Tratamiento') {
-                    accionRapida = `<a href="/tratamientos/?escenario_id=${riesgo.escenario_id}" style="font-size:0.8em; color: var(--color-primary); font-weight:600; text-decoration:none;">Tratar este riesgo →</a>`;
+                    celdaAccion = `<a href="/tratamientos/?escenario_id=${riesgo.escenario_id}" class="btn-tratar">Tratar riesgo →</a>`;
                 }
 
-                const card = document.createElement('div');
-                card.className = 'card-riesgo';
-                    card.innerHTML = `
-                        <div>
-                            <h4 style="margin:0 0 5px 0;">Activo: ${riesgo.activo_nombre}</h4>
-                            <p style="margin:0; color:#555;">Amenaza: ${riesgo.amenaza} | Vuln: ${riesgo.vulnerabilidad}</p>
-                            <p style="margin:5px 0 0 0; font-size:0.9em;">
-                                VA: ${riesgo.va} | Probabilidad: ${riesgo.probabilidad} | Riesgo Inherente: ${riesgo.riesgo_inherente.toFixed(2)}
-                            </p>
-                            <p style="margin:2px 0 0 0; font-size:0.85em; color:#555;">
-                                Estado: <strong>${riesgo.estado_tratamiento}</strong> · Detectado: ${riesgo.fecha_deteccion}
-                            </p>
-                            ${detalleControl}
-                            <p style="margin:2px 0 0 0; font-size:0.8em;">${badgeSla}</p>
-                            <p style="margin:4px 0 0 0;">${accionRapida}</p>
-                        </div>
-                        <div class="semaforo ${claseColor}">
-                            ${etiquetaRiesgo} (Riesgo Actual: ${riesgo.puntaje_total.toFixed(2)})
-                        </div>
-                    `;
-                contenedor.appendChild(card);
+                let controlTexto = riesgo.control_aplicado
+                    ? `<br><span style="font-size:0.78em; color:#555;">Control: ${riesgo.control_aplicado} (${(riesgo.eficacia_control * 100).toFixed(0)}%)</span>`
+                    : '';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${riesgo.activo_nombre}</strong></td>
+                    <td>${riesgo.amenaza}<br><span style="font-size:0.85em; color:#555;">${riesgo.vulnerabilidad}</span></td>
+                    <td><span class="semaforo ${info.clase}" style="font-size:0.7rem; padding:5px 10px;">${info.nivel}</span></td>
+                    <td>VA ${riesgo.va} · P ${riesgo.probabilidad} · R ${riesgo.puntaje_total.toFixed(2)}</td>
+                    <td><strong>${riesgo.estado_tratamiento}</strong>${controlTexto}</td>
+                    <td>${riesgo.fecha_deteccion}</td>
+                    <td>${celdaPlazo}</td>
+                    <td>${celdaAccion}</td>
+                `;
+                tbody.appendChild(tr);
             });
         })
         .catch(error => {
             console.error('Error al cargar el dashboard:', error);
-            contenedor.innerHTML = '<p style="color:red;">Error al conectar con la base de datos SQL Server.</p>';
-        })
-        .finally(() => {
-            // 2. Liberar el botón sin importar si hubo error o éxito
-            btnActualizar.disabled = false;
-            btnActualizar.innerText = 'Actualizar Dashboard';
+            tbody.innerHTML = '<tr><td colspan="8" style="color:red;">Error al conectar con la base de datos SQL Server.</td></tr>';
         });
+}
+
+function renderMttm(mttm) {
+    const niveles = ['Critico', 'Alto', 'Medio', 'Bajo'];
+    const etiquetas = { Critico: 'Crítico', Alto: 'Alto', Medio: 'Medio', Bajo: 'Bajo' };
+    const clases = { Critico: 'bg-rojo', Alto: 'bg-naranja', Medio: 'bg-amarillo', Bajo: 'bg-verde' };
+
+    let filas = '';
+    niveles.forEach(nivel => {
+        const info = mttm.por_nivel[nivel];
+        const promedio = info.promedio_dias !== null ? `${info.promedio_dias.toFixed(2)} días` : '—';
+        const meta = info.meta_dias !== null ? `Máximo ${info.meta_dias} días` : 'No aplica';
+
+        let estado = '<span style="color: var(--color-text-muted);">Sin escenarios tratados</span>';
+        if (info.promedio_dias !== null && info.meta_dias !== null) {
+            estado = info.cumple_meta
+                ? `<span class="semaforo bg-verde" style="font-size:0.7rem; padding:5px 10px;">Cumple</span>`
+                : `<span class="semaforo bg-rojo" style="font-size:0.7rem; padding:5px 10px;">No cumple</span>`;
+        } else if (info.promedio_dias !== null) {
+            estado = '<span style="color: var(--color-text-muted);">Sin meta definida</span>';
+        }
+
+        filas += `
+            <tr>
+                <td><span class="semaforo ${clases[nivel]}" style="font-size:0.7rem; padding:5px 10px;">${etiquetas[nivel]}</span></td>
+                <td>${promedio}</td>
+                <td>${meta}</td>
+                <td>${estado}</td>
+                <td style="text-align:center; font-weight:700;">${info.muestras}</td>
+            </tr>`;
+    });
+
+    document.getElementById('mttm-detalle').innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Nivel</th>
+                    <th>MTTM Real (promedio)</th>
+                    <th>Meta (Sección 6.3/7.3)</th>
+                    <th>Estado</th>
+                    <th>Riesgos Tratados</th>
+                </tr>
+            </thead>
+            <tbody>${filas}</tbody>
+        </table>
+    `;
+}
+
+function renderMatrizCalor(matriz) {
+    const cont = document.getElementById('matriz-calor');
+    const probabilidades = [3, 2, 1]; // filas: de más probable (arriba) a menos probable (abajo)
+    const impactos = [1, 2, 3]; // columnas: de menor a mayor impacto
+
+    function colorCelda(p, i) {
+        const severidad = p * i;
+        if (severidad <= 2) return '#16A34A';
+        if (severidad <= 4) return '#F59E0B';
+        if (severidad <= 6) return '#EA580C';
+        return '#B91C1C';
+    }
+
+    let html = `<div class="matriz-eje"></div>`;
+    impactos.forEach(i => { html += `<div class="matriz-eje">Impacto ${i}</div>`; });
+
+    probabilidades.forEach(p => {
+        html += `<div class="matriz-eje">Prob. ${p}</div>`;
+        impactos.forEach(i => {
+            const cantidad = matriz[`${p}-${i}`] || 0;
+            html += `<div class="matriz-celda" style="background-color:${colorCelda(p, i)};">${cantidad}</div>`;
+        });
+    });
+
+    cont.innerHTML = `<div class="matriz-calor">${html}</div>`;
 }
 
 function cargarKpisYGraficos() {
     fetch('/api/riesgos/kpis/')
         .then(response => response.json())
         .then(data => {
-            // --- Tarjetas de KPIs ---
             const kpiContenedor = document.getElementById('kpi-cards');
             const mttmGlobal = data.mttm.global_dias;
             const mttmTexto = mttmGlobal !== null ? `${mttmGlobal.toFixed(2)} días` : 'Sin datos';
@@ -114,11 +151,11 @@ function cargarKpisYGraficos() {
                 </div>
                 <div class="card-riesgo" style="flex-direction:column; align-items:flex-start;">
                     <p style="margin:0; font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase;">% Críticos sin Control</p>
-                    <h3 style="margin:4px 0 0 0; color: ${data.pct_criticos_sin_control > 0 ? 'var(--color-danger)' : 'var(--color-success)'};">${data.pct_criticos_sin_control}%</h3>
+                    <h3 style="margin:4px 0 0 0; color: ${data.pct_criticos_sin_control > 0 ? 'var(--color-risk-critico)' : 'var(--color-success)'};">${data.pct_criticos_sin_control}%</h3>
                 </div>
                 <div class="card-riesgo" style="flex-direction:column; align-items:flex-start;">
                     <p style="margin:0; font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase;">Escenarios con Plazo Vencido</p>
-                    <h3 style="margin:4px 0 0 0; color: ${data.sla.vencidos > 0 ? 'var(--color-danger)' : 'var(--color-success)'};">${data.sla.vencidos}</h3>
+                    <h3 style="margin:4px 0 0 0; color: ${data.sla.vencidos > 0 ? 'var(--color-risk-critico)' : 'var(--color-success)'};">${data.sla.vencidos}</h3>
                 </div>
                 <div class="card-riesgo" style="flex-direction:column; align-items:flex-start;">
                     <p style="margin:0; font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase;">Tiempo Medio de Mitigación (MTTM)</p>
@@ -126,47 +163,9 @@ function cargarKpisYGraficos() {
                 </div>
             `;
 
-            // --- Tabla de cumplimiento de MTTM por nivel de riesgo (Sección 7.3) ---
-            const mttmDetalle = document.getElementById('mttm-detalle');
-            if (mttmDetalle) {
-                const niveles = ['Critico', 'Alto', 'Medio', 'Bajo'];
-                const etiquetas = { Critico: 'Crítico', Alto: 'Alto', Medio: 'Medio', Bajo: 'Bajo' };
+            renderMttm(data.mttm);
+            renderMatrizCalor(data.matriz_calor);
 
-                let filas = '';
-                niveles.forEach(nivel => {
-                    const info = data.mttm.por_nivel[nivel];
-                    const promedio = info.promedio_dias !== null ? `${info.promedio_dias.toFixed(2)} días` : '—';
-                    const meta = info.meta_dias !== null ? `≤ ${info.meta_dias} días` : 'No aplica';
-                    let estado = '<span style="color: var(--color-text-muted);">Sin muestras</span>';
-                    if (info.promedio_dias !== null && info.meta_dias !== null) {
-                        estado = info.cumple_meta
-                            ? '<span class="badge riesgo-bajo">Cumple</span>'
-                            : '<span class="badge riesgo-critico">No cumple</span>';
-                    } else if (info.promedio_dias !== null) {
-                        estado = '<span style="color: var(--color-text-muted);">Sin meta definida</span>';
-                    }
-                    filas += `
-                        <tr>
-                            <td>${etiquetas[nivel]}</td>
-                            <td>${promedio}</td>
-                            <td>${meta}</td>
-                            <td>${estado}</td>
-                            <td>${info.muestras}</td>
-                        </tr>`;
-                });
-
-                mttmDetalle.innerHTML = `
-                    <h3 style="margin-top:0;">Cumplimiento de Tiempos de Mitigación (MTTM)</h3>
-                    <table>
-                        <thead>
-                            <tr><th>Nivel</th><th>MTTM Real</th><th>Meta (Sección 6.3/7.3)</th><th>Estado</th><th>Escenarios tratados</th></tr>
-                        </thead>
-                        <tbody>${filas}</tbody>
-                    </table>
-                `;
-            }
-
-            // --- Gráfico 1: Distribución de riesgos por nivel (dona) ---
             const zonas = data.distribucion_zonas;
             if (chartZonas) chartZonas.destroy();
             chartZonas = new Chart(document.getElementById('chart-zonas'), {
@@ -175,13 +174,12 @@ function cargarKpisYGraficos() {
                     labels: ['Bajo', 'Medio', 'Alto', 'Crítico'],
                     datasets: [{
                         data: [zonas.Bajo, zonas.Medio, zonas.Alto, zonas.Critico],
-                        backgroundColor: ['#16a34a', '#d97706', '#f97316', '#dc2626'],
+                        backgroundColor: ['#16A34A', '#F59E0B', '#EA580C', '#B91C1C'],
                     }],
                 },
                 options: { plugins: { legend: { position: 'bottom' } } },
             });
 
-            // --- Gráfico 2: Riesgo acumulado por categoría de activo (barras) ---
             const categorias = Object.keys(data.riesgo_por_categoria);
             const valoresCategoria = Object.values(data.riesgo_por_categoria);
             if (chartCategoria) chartCategoria.destroy();
@@ -189,28 +187,17 @@ function cargarKpisYGraficos() {
                 type: 'bar',
                 data: {
                     labels: categorias,
-                    datasets: [{
-                        label: 'Riesgo acumulado',
-                        data: valoresCategoria,
-                        backgroundColor: '#4f46e5',
-                    }],
+                    datasets: [{ label: 'Riesgo acumulado', data: valoresCategoria, backgroundColor: '#146C94' }],
                 },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } },
-                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
             });
 
-            // --- Gráfico 3: Cumplimiento de SLA (dona) ---
             if (chartSla) chartSla.destroy();
             chartSla = new Chart(document.getElementById('chart-sla'), {
                 type: 'doughnut',
                 data: {
                     labels: ['En Plazo', 'Vencidos'],
-                    datasets: [{
-                        data: [data.sla.en_plazo, data.sla.vencidos],
-                        backgroundColor: ['#16a34a', '#dc2626'],
-                    }],
+                    datasets: [{ data: [data.sla.en_plazo, data.sla.vencidos], backgroundColor: ['#16A34A', '#B91C1C'] }],
                 },
                 options: { plugins: { legend: { position: 'bottom' } } },
             });
@@ -218,12 +205,14 @@ function cargarKpisYGraficos() {
         .catch(error => console.error('Error al cargar los KPIs:', error));
 }
 
-// Cargar al iniciar y asignar evento al botón de actualizar
 document.addEventListener("DOMContentLoaded", () => {
     cargarDashboard();
     cargarKpisYGraficos();
 });
-document.getElementById('btn-actualizar').addEventListener('click', () => {
+
+document.getElementById('btn-actualizar').addEventListener('click', function () {
+    this.classList.add('girando');
     cargarDashboard();
     cargarKpisYGraficos();
+    setTimeout(() => this.classList.remove('girando'), 600);
 });

@@ -1,0 +1,31 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Argos · Bitácora de Auditoría</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    {% include 'mercpd_app/partials/sidebar.html' %}
+
+    <div class="main-content" id="main-content">
+    <div class="page">
+        <div class="page-header">
+            <h2>Bitácora de Auditoría</h2>
+            <p>Registro cronológico de las acciones realizadas en el sistema (últimas 200).</p>
+        </div>
+        <div class="container">
+            <table id="tabla-auditoria">
+                <thead>
+                    <tr><th>Fecha</th><th>Tabla</th><th>Acción</th><th>Usuario</th><th>Detalle</th></tr>
+                </thead>
+                <tbody><tr><td colspan="5">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+    <script src="{% static 'js/auditoria.js' %}"></script>
+</body>
+</html>

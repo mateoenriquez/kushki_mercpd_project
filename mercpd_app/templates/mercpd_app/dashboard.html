@@ -1,61 +1,63 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Argos · MERC-PD | Dashboard de Monitoreo</title>
+    <title>Argos · Dashboard de Monitoreo</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="/static/js/vendor/chart.umd.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-links">
-            <a href="/">Dashboard</a>
-            {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}
-                <a href="/activos/">Activos</a>
-                <a href="/riesgos/">Riesgos</a>
-                <a href="/tratamientos/">Tratamientos</a>
-            {% endif %}
-            <a href="/comunicacion/">Comunicación</a>
-            {% if request.session.usuario_rol == 'Administrador' %}
-                <a href="/usuarios/registrar/">Usuarios</a>
-            {% endif %}
-        </div>
-            <div style="display:flex; align-items:center; gap:12px; font-size:0.85rem; color: var(--color-text-muted);">
-                <span>{{ request.session.usuario_nombre }} ({{ request.session.usuario_rol }})</span>
-                <a href="/logout/" style="color: var(--color-danger); text-decoration:none; font-weight:600;">Cerrar sesión</a>
-        </div>
-    </nav>
+    {% include 'mercpd_app/partials/sidebar.html' %}
 
-    <div class="page">
-        <div class="page-header">
-            <h2>Dashboard de Monitoreo</h2>
-            <p>Semáforo de riesgo cibernético en tiempo real, calculado con la metodología MERC-PD.</p>
+    <div class="main-content" id="main-content">
+    <div class="page page-wide">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+            <div>
+                <h2>Dashboard de Monitoreo</h2>
+                <p>Semáforo de riesgo cibernético en tiempo real, calculado con la metodología MERC-PD.</p>
+            </div>
+            <button id="btn-actualizar" class="btn-icon-refresh" title="Actualizar dashboard" aria-label="Actualizar dashboard">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M1 20v-6h6"></path>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+            </button>
         </div>
 
-        <!-- Tarjetas de KPIs (Sección 7.3 de la metodología) -->
-        <div class="container" style="margin-bottom: 20px;">
-            <div id="kpi-cards" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px;">
+        <div class="container container-wide" style="margin-bottom: 20px;">
+            <div id="kpi-cards" class="kpi-grid">
                 <p>Cargando indicadores...</p>
             </div>
-            <div id="mttm-detalle" style="margin-top:20px;">
-                <p>Cargando indicadores de mitigación...</p>
-            </div>
         </div>
 
-        <!-- Gráficos: distribución por zona, riesgo por categoría y cumplimiento SLA -->
-        <div class="container" style="margin-bottom: 20px;">
+        <div class="container container-wide" style="margin-bottom: 20px;">
+            <p style="margin-top:0; color:var(--color-text-muted); font-size:0.9rem;">
+                El <strong>MTTM (Tiempo Medio de Mitigación)</strong> mide, en promedio, cuántos días tarda el equipo en cerrar un riesgo desde que se detecta hasta que se aplica un tratamiento. Cada nivel de riesgo tiene una meta máxima según la metodología MERC-PD.
+            </p>
+            <div id="mttm-detalle"><p>Cargando indicadores de mitigación...</p></div>
+        </div>
+
+        <div class="container container-wide" style="margin-bottom: 20px;">
+            <h3 style="margin-top:0;">Matriz de Calor · Probabilidad × Impacto</h3>
+            <p style="color:var(--color-text-muted); font-size:0.85rem;">Cantidad de riesgos registrados según su combinación de Probabilidad (filas) e Impacto Base (columnas).</p>
+            <div id="matriz-calor"></div>
+        </div>
+
+        <div class="container container-wide" style="margin-bottom: 20px;">
             <h3 style="margin-top:0;">Indicadores Visuales</h3>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:24px;">
-                <div>
+            <div class="charts-grid">
+                <div style="min-width:260px;">
                     <p style="text-align:center; font-weight:600; color: var(--color-text-muted); font-size:0.85rem; text-transform:uppercase;">Riesgos por Nivel</p>
                     <canvas id="chart-zonas" height="220"></canvas>
                 </div>
-                <div>
+                <div style="min-width:260px;">
                     <p style="text-align:center; font-weight:600; color: var(--color-text-muted); font-size:0.85rem; text-transform:uppercase;">Riesgo Acumulado por Categoría de Activo</p>
                     <canvas id="chart-categoria" height="220"></canvas>
                 </div>
-                <div>
+                <div style="min-width:260px;">
                     <p style="text-align:center; font-weight:600; color: var(--color-text-muted); font-size:0.85rem; text-transform:uppercase;">Cumplimiento de Plazos (SLA)</p>
                     <canvas id="chart-sla" height="220"></canvas>
                 </div>
@@ -63,16 +65,30 @@
         </div>
 
         <div class="container">
-            <button id="btn-actualizar" style="margin-bottom: 20px;">Actualizar Dashboard</button>
-
-            <div id="contenedor-riesgos">
-                <p>Cargando matriz de riesgos...</p>
+            <h3 style="margin-top:0;">Matriz de Riesgos Detallada</h3>
+            <div class="tabla-riesgos-wrapper">
+                <table id="tabla-riesgos">
+                    <thead>
+                        <tr>
+                            <th>Activo</th>
+                            <th>Amenaza / Vulnerabilidad</th>
+                            <th>Nivel</th>
+                            <th>VA / Prob. / Riesgo</th>
+                            <th>Estado</th>
+                            <th>Detectado</th>
+                            <th>Plazo límite</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody><tr><td colspan="8">Cargando matriz de riesgos...</td></tr></tbody>
+                </table>
             </div>
         </div>
     </div>
+    </div>
 
     <script>
-    window.PUEDE_TRATAR = {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}true{% else %}false{% endif %};
+        window.PUEDE_TRATAR = {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}true{% else %}false{% endif %};
     </script>
     <script src="/static/js/dashboard.js"></script>
 </body>

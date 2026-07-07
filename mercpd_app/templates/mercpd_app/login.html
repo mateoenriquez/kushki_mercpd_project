@@ -3,35 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Argos · MERC-PD | Iniciar Sesión</title>
+    <title>Argos · Iniciar Sesión</title>
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
-<body>
-    <div class="page" style="max-width: 420px; padding-top: 80px;">
-        <div class="page-header" style="text-align:center;">
-            <h2>Argos · MERC-PD</h2>
-            <p>Ingresa tus credenciales para acceder al sistema.</p>
-        </div>
+<body style="margin: 0; background-color: var(--color-background);">
+    {% load static %}
 
-        <div class="container">
-            {% if error %}
-                <div class="alert" style="background-color: var(--color-danger-bg); color: var(--color-danger); border-color: var(--color-danger);">
-                    {{ error }}
-                </div>
-            {% endif %}
+    <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; width: 100%; padding: 20px; box-sizing: border-box;">
+        
+        <div class="page" style="max-width: 420px; width: 100%; margin: 0;">
+            
+            <div class="page-header" style="text-align: center; display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+                <img src="{% static 'img/argos-logo.png' %}" alt="Logo Argos" style="height: 200px; width: auto; margin-bottom: -60px;">
+                
+                <img src="{% static 'img/titulo-argos.png' %}" alt="Argos" style="height: 55px; width: auto; margin-bottom: 12px;">
+                
+                <p style="margin: 0; color: var(--color-text-muted);">Ingresa tus credenciales para acceder al sistema.</p>
+            </div>
 
-            <form method="POST" action="/login/{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="email">Correo:</label>
-                    <input type="text" id="email" name="email" required placeholder="usuario@kushkitest.com">
-                </div>
-                <div class="form-group">
-                    <label for="password">Contraseña:</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit" style="width:100%;">Ingresar</button>
-            </form>
+            <div class="container">
+                {% if error %}
+                    <div class="alert" style="background-color: var(--color-danger-bg); color: var(--color-danger); border-color: var(--color-danger); margin-bottom: 16px;">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="/login/{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="email">Correo:</label>
+                        <input type="text" id="email" name="email" required placeholder="usuario@kushkitest.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Contraseña:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" style="width:100%;">Ingresar</button>
+                </form>
+            </div>
         </div>
     </div>
 </body>
