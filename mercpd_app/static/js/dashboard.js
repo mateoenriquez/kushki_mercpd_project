@@ -44,6 +44,22 @@ function cargarDashboard() {
                     }
                 }
 
+                // Corrección #3: detalle del control aplicado y su eficacia,
+                // visible para cualquier rol que vea esta tarjeta (incluye
+                // al Custodio de Activo, que antes no tenía este dato).
+                let detalleControl = '';
+                if (riesgo.control_aplicado) {
+                    detalleControl = `<p style="margin:2px 0 0 0; font-size:0.8em; color:#555;">Control aplicado: <strong>${riesgo.control_aplicado}</strong> (eficacia: ${(riesgo.eficacia_control * 100).toFixed(0)}%)</p>`;
+                }
+
+                // Corrección #2: acción rápida "Tratar este riesgo →", solo
+                // visible para roles que pueden acceder a /tratamientos/
+                // (window.PUEDE_TRATAR se define en dashboard.html).
+                let accionRapida = '';
+                if (window.PUEDE_TRATAR && riesgo.estado_tratamiento === 'Sin Tratamiento') {
+                    accionRapida = `<a href="/tratamientos/?escenario_id=${riesgo.escenario_id}" style="font-size:0.8em; color: var(--color-primary); font-weight:600; text-decoration:none;">Tratar este riesgo →</a>`;
+                }
+
                 const card = document.createElement('div');
                 card.className = 'card-riesgo';
                     card.innerHTML = `
@@ -56,7 +72,9 @@ function cargarDashboard() {
                             <p style="margin:2px 0 0 0; font-size:0.85em; color:#555;">
                                 Estado: <strong>${riesgo.estado_tratamiento}</strong> · Detectado: ${riesgo.fecha_deteccion}
                             </p>
+                            ${detalleControl}
                             <p style="margin:2px 0 0 0; font-size:0.8em;">${badgeSla}</p>
+                            <p style="margin:4px 0 0 0;">${accionRapida}</p>
                         </div>
                         <div class="semaforo ${claseColor}">
                             ${etiquetaRiesgo} (Riesgo Actual: ${riesgo.puntaje_total.toFixed(2)})

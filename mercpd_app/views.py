@@ -220,7 +220,7 @@ def api_activos_lista(request):
     return JsonResponse({'activos': data})
 
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def api_usuarios_lista(request):
     """
     Devuelve el catálogo de usuarios registrados en el sistema, usado para
@@ -236,7 +236,7 @@ def api_usuarios_lista(request):
     return JsonResponse({'usuarios': data})
 
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def api_amenazas_lista(request):
     """
     Devuelve el catálogo REAL de amenazas (sembrado en la Fase 1 en SQL Server),
@@ -250,7 +250,7 @@ def api_amenazas_lista(request):
     return JsonResponse({'amenazas': data})
 
 
-@login_requerido
+@rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def api_vulnerabilidades_lista(request):
     """
     Devuelve el catálogo REAL de vulnerabilidades (sembrado en la Fase 1 en SQL Server),
@@ -467,23 +467,25 @@ def api_dashboard_datos(request):
         if not ultimo_tratamiento and esc.fechalimitetratamiento:
             dias_restantes = (esc.fechalimitetratamiento - ahora).days
 
-        riesgos.append({
-            'escenario_id': esc.escenarioid,
-            'activo_nombre': esc.activo.nombre,
-            'amenaza': esc.amenaza.nombre,
-            'vulnerabilidad': esc.vulnerabilidad.nombre,
-            'va': float(esc.activo.valoractivo),
-            'probabilidad': esc.probabilidad,
-            'impacto_final': float(esc.impactofinal),
-            'riesgo_inherente': float(esc.riesgototal),
-            'estado_tratamiento': ultimo_tratamiento.opciontratamiento if ultimo_tratamiento else 'Sin Tratamiento',
-            'riesgo_actual': riesgo_actual,
-            'puntaje_total': riesgo_actual,
-            'fecha_deteccion': esc.fechaevaluacion.strftime('%Y-%m-%d'),
-            'fecha_limite_tratamiento': esc.fechalimitetratamiento.strftime('%Y-%m-%d') if esc.fechalimitetratamiento else None,
-            'dias_restantes': dias_restantes,
-            'vencido': vencido,
-        })
+            riesgos.append({
+                'escenario_id': esc.escenarioid,
+                'activo_nombre': esc.activo.nombre,
+                'amenaza': esc.amenaza.nombre,
+                'vulnerabilidad': esc.vulnerabilidad.nombre,
+                'va': float(esc.activo.valoractivo),
+                'probabilidad': esc.probabilidad,
+                'impacto_final': float(esc.impactofinal),
+                'riesgo_inherente': float(esc.riesgototal),
+                'estado_tratamiento': ultimo_tratamiento.opciontratamiento if ultimo_tratamiento else 'Sin Tratamiento',
+                'control_aplicado': ultimo_tratamiento.controlaplicado if ultimo_tratamiento else None,
+                'eficacia_control': float(ultimo_tratamiento.eficaciacontrol) if ultimo_tratamiento else None,
+                'riesgo_actual': riesgo_actual,
+                'puntaje_total': riesgo_actual,
+                'fecha_deteccion': esc.fechaevaluacion.strftime('%Y-%m-%d'),
+                'fecha_limite_tratamiento': esc.fechalimitetratamiento.strftime('%Y-%m-%d') if esc.fechalimitetratamiento else None,
+                'dias_restantes': dias_restantes,
+                'vencido': vencido,
+            })
 
     return JsonResponse({'riesgos': riesgos})
 

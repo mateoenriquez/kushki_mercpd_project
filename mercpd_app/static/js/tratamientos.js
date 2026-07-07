@@ -28,6 +28,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 option.textContent = e.etiqueta;
                 select.appendChild(option);
             });
+
+            // Preselección: si se llegó desde "Tratar este riesgo →" en el
+            // Dashboard, la URL trae ?escenario_id=X — lo seleccionamos y
+            // quitamos el estado "disabled selected" del placeholder.
+            const params = new URLSearchParams(window.location.search);
+            const escenarioPreseleccionado = params.get('escenario_id');
+            if (escenarioPreseleccionado) {
+                select.value = escenarioPreseleccionado;
+                document.getElementById('opcion_tratamiento').focus();
+            }
         })
         .catch(error => console.error('Error al cargar escenarios:', error));
 });

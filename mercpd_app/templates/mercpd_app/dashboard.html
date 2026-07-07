@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MERC-PD | Dashboard de Monitoreo</title>
+    <title>Argos · MERC-PD | Dashboard de Monitoreo</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="/static/js/vendor/chart.umd.js"></script>
 </head>
@@ -71,6 +71,9 @@
         </div>
     </div>
 
+    <script>
+    window.PUEDE_TRATAR = {% if request.session.usuario_rol == 'Administrador' or request.session.usuario_rol == 'Arquitecto de Seguridad' %}true{% else %}false{% endif %};
+    </script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
