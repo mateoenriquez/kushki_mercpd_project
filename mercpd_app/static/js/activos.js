@@ -1,8 +1,22 @@
-// Cargar catálogo de usuarios (custodios) al iniciar la pantalla.
-// El campo es opcional: se agrega una opción "Sin asignar" además de los usuarios reales.
-// Si la petición falla, el select se libera igual para no bloquear el formulario.
-document.addEventListener("DOMContentLoaded", () => {
+function mostrarResultado(elemento, mensaje, esExito = true) {
+    elemento.classList.remove('hidden');
+    elemento.textContent = mensaje;
+    elemento.style.backgroundColor = esExito ? 'var(--color-success-bg)' : 'var(--color-danger-bg)';
+    elemento.style.color = esExito ? 'var(--color-success)' : 'var(--color-danger)';
+    elemento.style.borderColor = esExito ? 'var(--color-success)' : 'var(--color-danger)';
+}
+
+function crearOpcion(valor, texto, seleccionada = false) {
+    const option = document.createElement('option');
+    option.value = valor;
+    option.textContent = texto;
+    option.selected = seleccionada;
+    return option;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     const selectCustodio = document.getElementById('custodio_id');
+    if (!selectCustodio) return;
 
     fetch('/api/usuarios/lista/')
         .then(response => {
@@ -10,70 +24,53 @@ document.addEventListener("DOMContentLoaded", () => {
             return response.json();
         })
         .then(data => {
-            selectCustodio.innerHTML = '';
-
-            const optSinAsignar = document.createElement('option');
-            optSinAsignar.value = '';
-            optSinAsignar.selected = true;
-            optSinAsignar.textContent = 'Sin asignar';
-            selectCustodio.appendChild(optSinAsignar);
-
+            selectCustodio.replaceChildren(crearOpcion('', 'Sin asignar', true));
             (data.usuarios || []).forEach(usuario => {
-                const option = document.createElement('option');
-                option.value = usuario.id;
-                option.textContent = `${usuario.nombre} (${usuario.rol})`;
-                selectCustodio.appendChild(option);
+                selectCustodio.appendChild(crearOpcion(usuario.id, `${usuario.nombre} (${usuario.rol})`));
             });
         })
         .catch(error => {
             console.error('Error al cargar usuarios/custodios:', error);
-            selectCustodio.innerHTML = '';
-            const optError = document.createElement('option');
-            optError.value = '';
-            optError.selected = true;
-            optError.textContent = 'Sin asignar (catálogo no disponible)';
-            selectCustodio.appendChild(optError);
+            selectCustodio.replaceChildren(crearOpcion('', 'Sin asignar (catálogo no disponible)', true));
         });
-});
 
-document.getElementById('form-activo').addEventListener('submit', function(e) {
-    e.preventDefault();
+    const form = document.getElementById('form-activo');
+    if (!form) return;
 
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
-
-    // Validación estricta del rango (1 al 3) en Frontend
-    if (data.confidencialidad < 1 || data.confidencialidad > 3 ||
-        data.integridad < 1 || data.integridad > 3 ||
-        data.disponibilidad < 1 || data.disponibilidad > 3) {
-        alert('Error: Los valores de la triada CIA deben estar entre 1 y 3.');
-        return;
-    }
-
-    fetch('/api/activos/registrar/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': data.csrfmiddlewaretoken
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
         const divResultado = document.getElementById('resultado-va');
-        divResultado.classList.remove('hidden');
-        if (result.success) {
-            divResultado.innerHTML = `<strong>Éxito:</strong> Activo registrado. Valor del Activo (VA) calculado: ${result.va.toFixed(2)}`;
-            divResultado.style.backgroundColor = 'var(--color-success-bg)';
-            divResultado.style.color = 'var(--color-success)';
-            divResultado.style.borderColor = 'var(--color-success)';
-            document.getElementById('form-activo').reset();
-        } else {
-            divResultado.innerHTML = `<strong>Error:</strong> ${result.message}`;
-            divResultado.style.backgroundColor = 'var(--color-danger-bg)';
-            divResultado.style.color = 'var(--color-danger)';
-            divResultado.style.borderColor = 'var(--color-danger)';
+
+        const c = Number(data.confidencialidad);
+        const i = Number(data.integridad);
+        const d = Number(data.disponibilidad);
+        if (![c, i, d].every(v => Number.isInteger(v) && v >= 1 && v <= 3)) {
+            mostrarResultado(divResultado, 'Error: Los valores de la triada CIA deben estar entre 1 y 3.', false);
+            return;
         }
-    })
-    .catch(error => console.error('Error en la petición Fetch:', error));
+
+        fetch('/api/activos/registrar/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': data.csrfmiddlewaretoken,
+            },
+            body: JSON.stringify(data),
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    mostrarResultado(divResultado, `Éxito: Activo registrado. Valor del Activo (VA) calculado: ${Number(result.va).toFixed(2)}`);
+                    form.reset();
+                } else {
+                    mostrarResultado(divResultado, `Error: ${result.message || 'No se pudo registrar el activo.'}`, false);
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición Fetch:', error);
+                mostrarResultado(divResultado, 'Error: No se pudo conectar con el servidor.', false);
+            });
+    });
 });

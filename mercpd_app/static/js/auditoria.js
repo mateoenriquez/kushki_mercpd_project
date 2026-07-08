@@ -1,18 +1,24 @@
-document.addEventListener("DOMContentLoaded", () => {
+function crearCelda(texto) {
+    const td = document.createElement('td');
+    td.textContent = texto ?? '—';
+    return td;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     fetch('/api/auditoria/lista/')
         .then(response => response.json())
         .then(data => {
             const tbody = document.querySelector('#tabla-auditoria tbody');
-            tbody.innerHTML = '';
+            if (!tbody) return;
+            tbody.replaceChildren();
+
             (data.auditoria || []).forEach(a => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${a.fecha}</td>
-                    <td>${a.tabla}</td>
-                    <td>${a.accion}</td>
-                    <td>${a.usuario}</td>
-                    <td>${a.detalle || '—'}</td>
-                `;
+                tr.appendChild(crearCelda(a.fecha));
+                tr.appendChild(crearCelda(a.tabla));
+                tr.appendChild(crearCelda(a.accion));
+                tr.appendChild(crearCelda(a.usuario));
+                tr.appendChild(crearCelda(a.detalle || '—'));
                 tbody.appendChild(tr);
             });
         })

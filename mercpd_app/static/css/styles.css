@@ -1,6 +1,5 @@
 /* ============================================================
-   MERC-PD | Kushki — Hoja de estilos unificada
-   Diseño minimalista / profesional / moderno
+   MERC-PD | Argos — estilos consolidados y corregidos
    ============================================================ */
 
 :root {
@@ -9,32 +8,36 @@
     --color-border: #e4e7eb;
     --color-text: #1a2233;
     --color-text-muted: #6b7280;
-
     --color-primary: #146C94;
     --color-primary-hover: #0B2447;
     --color-primary-soft: #E6F6FB;
-
     --color-success: #16a34a;
     --color-success-bg: #ecfdf3;
     --color-warning: #d97706;
     --color-warning-bg: #fffbeb;
     --color-danger: #dc2626;
     --color-danger-bg: #fef2f2;
-
+    --color-risk-muy-bajo: #0EA5E9;
+    --color-risk-bajo: #16A34A;
+    --color-risk-medio: #F59E0B;
+    --color-risk-alto: #EA580C;
+    --color-risk-critico: #B91C1C;
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 14px;
-
     --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
     --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.08);
-
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --sidebar-width: 264px;
+    --sidebar-width-collapsed: 76px;
+    --sidebar-bg: #0B2447;
+    --sidebar-bg-hover: #12315E;
+    --sidebar-text: #B9C6D6;
+    --sidebar-text-active: #FFFFFF;
+    --sidebar-border: #1B3A63;
 }
 
-* {
-    box-sizing: border-box;
-}
-
+* { box-sizing: border-box; }
 body {
     font-family: var(--font-sans);
     background-color: var(--color-bg);
@@ -44,92 +47,14 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ============================================================
-   NAVEGACIÓN
-   ============================================================ */
+.main-content { margin-left: var(--sidebar-width); transition: margin-left 0.25s ease; min-height: 100vh; }
+body.sidebar-collapsed .main-content { margin-left: var(--sidebar-width-collapsed); }
 
-.navbar {
-    background-color: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-    padding: 14px 32px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.navbar-brand {
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--color-text);
-    letter-spacing: -0.01em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.navbar-brand .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-primary);
-    display: inline-block;
-}
-
-.navbar-links {
-    display: flex;
-    gap: 4px;
-}
-
-.navbar-links a {
-    text-decoration: none;
-    color: var(--color-text-muted);
-    font-size: 0.9rem;
-    font-weight: 500;
-    padding: 8px 14px;
-    border-radius: var(--radius-sm);
-    transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.navbar-links a:hover {
-    background-color: var(--color-bg);
-    color: var(--color-text);
-}
-
-.navbar-links a.active {
-    background-color: var(--color-primary-soft);
-    color: var(--color-primary);
-}
-
-/* ============================================================
-   LAYOUT GENERAL
-   ============================================================ */
-
-.page {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 40px 24px 64px;
-}
-
-.page-header {
-    margin-bottom: 28px;
-}
-
-.page-header h2 {
-    margin: 0 0 6px 0;
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--color-text);
-}
-
-.page-header p {
-    margin: 0;
-    color: var(--color-text-muted);
-    font-size: 0.925rem;
-}
+.page { max-width: 900px; margin: 0 auto; padding: 40px 24px 64px; }
+.page-wide, .container-wide { max-width: 1400px; }
+.page-header { margin-bottom: 28px; }
+.page-header h2 { margin: 0 0 6px; font-size: 1.5rem; font-weight: 700; color: var(--color-text); }
+.page-header p { margin: 0; color: var(--color-text-muted); font-size: 0.925rem; }
 
 .container {
     max-width: 900px;
@@ -141,30 +66,9 @@ body {
     border: 1px solid var(--color-border);
 }
 
-h1, h2, h3 {
-    color: var(--color-text);
-}
-
-/* ============================================================
-   FORMULARIOS
-   ============================================================ */
-
-.form-group {
-    margin-bottom: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.form-group label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-text);
-}
-
-.form-group input[type="text"],
-.form-group input[type="number"],
-.form-group select {
+.form-group { margin-bottom: 18px; display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 0.85rem; font-weight: 600; color: var(--color-text); }
+.form-group input[type="text"], .form-group input[type="password"], .form-group input[type="number"], .form-group select {
     font-family: var(--font-sans);
     font-size: 0.95rem;
     padding: 10px 12px;
@@ -172,56 +76,23 @@ h1, h2, h3 {
     border-radius: var(--radius-sm);
     background-color: var(--color-surface);
     color: var(--color-text);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
     width: 100%;
 }
-
-.form-group input[type="text"]:focus,
-.form-group input[type="number"]:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-soft);
-}
-
-.form-group input::placeholder {
-    color: #9ca3af;
-}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
 
 fieldset {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     padding: 20px;
-    margin: 0 0 20px 0;
-}
-
-fieldset legend {
-    padding: 0 8px;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-fieldset .form-group:last-child {
-    margin-bottom: 0;
-}
-
-/* Grid de 3 columnas para los campos de valoración numérica */
-fieldset {
+    margin: 0 0 20px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px 20px;
     align-items: end;
 }
+fieldset legend { grid-column: 1 / -1; padding: 0 8px; font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
-fieldset legend {
-    grid-column: 1 / -1;
-}
-
-button[type="submit"],
-button#btn-actualizar {
+button[type="submit"], button#btn-actualizar, .btn-icon-refresh {
     font-family: var(--font-sans);
     background-color: var(--color-primary);
     color: #ffffff;
@@ -233,204 +104,12 @@ button#btn-actualizar {
     cursor: pointer;
     transition: background-color 0.15s ease, transform 0.05s ease;
 }
+button[type="submit"]:hover, button#btn-actualizar:hover { background-color: var(--color-primary-hover); }
+button[type="submit"]:active, button#btn-actualizar:active { transform: translateY(1px); }
 
-button[type="submit"]:hover,
-button#btn-actualizar:hover {
-    background-color: var(--color-primary-hover);
-}
+.alert { margin-top: 18px; padding: 14px 16px; border-radius: var(--radius-md); font-size: 0.9rem; border: 1px solid transparent; }
+.hidden { display: none !important; }
 
-button[type="submit"]:active,
-button#btn-actualizar:active {
-    transform: translateY(1px);
-}
-
-/* ============================================================
-   ALERTAS / RESULTADOS
-   ============================================================ */
-
-.alert {
-    margin-top: 18px;
-    padding: 14px 16px;
-    border-radius: var(--radius-md);
-    font-size: 0.9rem;
-    border: 1px solid transparent;
-}
-
-.hidden {
-    display: none !important;
-}
-
-/* ============================================================
-   DASHBOARD — TARJETAS DE RIESGO / SEMÁFORO
-   ============================================================ */
-
-.card-riesgo {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: 18px 20px;
-    margin-bottom: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.15s ease;
-}
-
-.card-riesgo:hover {
-    box-shadow: var(--shadow-md);
-}
-
-.card-riesgo h4 {
-    margin: 0 0 4px 0;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--color-text);
-}
-
-.card-riesgo p {
-    margin: 2px 0 0 0;
-    color: var(--color-text-muted);
-    font-size: 0.875rem;
-}
-
-.semaforo {
-    font-weight: 700;
-    font-size: 0.8rem;
-    padding: 8px 16px;
-    border-radius: 999px;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-}
-
-.bg-verde { background-color: var(--color-success); }
-.bg-amarillo { background-color: var(--color-warning); color: #ffffff; }
-.bg-rojo { background-color: var(--color-danger); }
-
-/* ============================================================
-   TABLAS DE DATOS
-   ============================================================ */
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-th, td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid var(--color-border);
-}
-
-th {
-    background-color: var(--color-bg);
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.badge {
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: white;
-    text-transform: uppercase;
-}
-
-.riesgo-critico { background-color: var(--color-danger); }
-.riesgo-medio { background-color: var(--color-warning); color: #ffffff; }
-.riesgo-bajo { background-color: var(--color-success); }
-
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-
-@media (max-width: 640px) {
-    .navbar {
-        padding: 12px 16px;
-        flex-direction: column;
-        gap: 10px;
-        align-items: flex-start;
-    }
-
-    .page {
-        padding: 24px 16px 48px;
-    }
-
-    .container {
-        padding: 20px;
-    }
-
-    fieldset {
-        grid-template-columns: 1fr;
-    }
-
-    .card-riesgo {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-}
-
-/* ============================================================
-   ARGOS · Paleta de marca + Sidebar + Extras (Fase 5)
-   ============================================================ */
-
-:root {
-    --color-primary: #146C94;
-    --color-primary-hover: #0B2447;
-    --color-primary-soft: #E6F6FB;
-
-    /* Paleta de riesgo con 5 niveles bien diferenciados */
-    --color-risk-muy-bajo: #0EA5E9;
-    --color-risk-bajo: #16A34A;
-    --color-risk-medio: #F59E0B;
-    --color-risk-alto: #EA580C;
-    --color-risk-critico: #B91C1C;
-
-    --sidebar-width: 264px;
-    --sidebar-width-collapsed: 76px;
-    --sidebar-bg: #0B2447;
-    --sidebar-bg-hover: #12315E;
-    --sidebar-text: #B9C6D6;
-    --sidebar-text-active: #FFFFFF;
-    --sidebar-border: #1B3A63;
-}
-
-/* Semáforo con 4 colores distintos: Medio y Alto ya NO se confunden */
-.bg-azul { background-color: var(--color-risk-muy-bajo); color: #ffffff; }
-.bg-verde { background-color: var(--color-risk-bajo); }
-.bg-amarillo { background-color: var(--color-risk-medio); color: #ffffff; }
-.bg-naranja { background-color: var(--color-risk-alto); color: #ffffff; }
-.bg-rojo { background-color: var(--color-risk-critico); }
-.bg-celeste {
-    background-color: #0EA5E9;
-    color: #ffffff;
-}
-
-.riesgo-muy-bajo { background-color: var(--color-risk-muy-bajo); color: #ffffff; }
-.riesgo-bajo { background-color: var(--color-risk-bajo); }
-.riesgo-medio { background-color: var(--color-risk-medio); color: #ffffff; }
-.riesgo-alto { background-color: var(--color-risk-alto); color: #ffffff; }
-.riesgo-critico { background-color: var(--color-risk-critico); }
-
-/* ---------- Layout general con sidebar ---------- */
-.main-content {
-    margin-left: var(--sidebar-width);
-    transition: margin-left 0.25s ease;
-    min-height: 100vh;
-}
-body.sidebar-collapsed .main-content {
-    margin-left: var(--sidebar-width-collapsed);
-}
-
-/* ---------- Sidebar ---------- */
 .sidebar {
     position: fixed;
     top: 0;
@@ -445,20 +124,9 @@ body.sidebar-collapsed .main-content {
     overflow: visible;
 }
 body.sidebar-collapsed .sidebar { width: var(--sidebar-width-collapsed); }
-
-.sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 20px 12px;
-    border-bottom: 1px solid var(--sidebar-border);
-    min-height: 72px;
-}
-.sidebar-header img.sidebar-logo { height: 34px; width: auto; flex-shrink: 0; }
+.sidebar-header { display: flex; align-items: center; justify-content: center; padding: 20px 12px; border-bottom: 1px solid var(--sidebar-border); min-height: 72px; }
 .sidebar-header img.sidebar-title-img { height: 26px; width: auto; transition: opacity 0.2s ease; }
 body.sidebar-collapsed .sidebar-header img.sidebar-title-img { display: none; }
-
 .sidebar-toggle {
     position: absolute;
     top: 22px;
@@ -473,13 +141,9 @@ body.sidebar-collapsed .sidebar-header img.sidebar-title-img { display: none; }
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    transition: transform 0.25s ease;
 }
 body.sidebar-collapsed .sidebar-toggle { transform: rotate(180deg); }
-
 .sidebar-nav { flex: 1; overflow-y: auto; padding: 14px 10px; }
-
 .nav-item-btn {
     width: 100%;
     display: flex;
@@ -495,57 +159,24 @@ body.sidebar-collapsed .sidebar-toggle { transform: rotate(180deg); }
     border-radius: var(--radius-sm);
     cursor: pointer;
     white-space: nowrap;
-    transition: background-color 0.15s ease, color 0.15s ease;
 }
 .nav-item-btn:hover, .nav-item-btn.active { background-color: var(--sidebar-bg-hover); color: var(--sidebar-text-active); }
-.nav-item-btn .nav-icon { width: 18px; text-align: center; flex-shrink: 0; }
-.nav-item-btn .nav-label { flex: 1; text-align: left; }
-.nav-item-btn .nav-chevron { transition: transform 0.2s ease; font-size: 0.7rem; }
+.nav-icon { width: 18px; text-align: center; flex-shrink: 0; }
+.nav-label { flex: 1; text-align: left; }
+.nav-chevron { transition: transform 0.2s ease; font-size: 0.7rem; }
 .nav-item-btn.open .nav-chevron { transform: rotate(90deg); }
-body.sidebar-collapsed .nav-label,
-body.sidebar-collapsed .nav-chevron { display: none; }
-
-.submenu {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.25s ease;
-}
+body.sidebar-collapsed .nav-label, body.sidebar-collapsed .nav-chevron { display: none; }
+.submenu { list-style: none; margin: 0; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
 .submenu.open { max-height: 300px; }
-.submenu a {
-    display: block;
-    padding: 9px 12px 9px 44px;
-    color: var(--sidebar-text);
-    text-decoration: none;
-    font-size: 0.85rem;
-    border-radius: var(--radius-sm);
-}
+.submenu a { display: block; padding: 9px 12px 9px 44px; color: var(--sidebar-text); text-decoration: none; font-size: 0.85rem; border-radius: var(--radius-sm); }
 .submenu a:hover, .submenu a.active { background-color: var(--sidebar-bg-hover); color: var(--sidebar-text-active); }
 body.sidebar-collapsed .submenu { display: none; }
-
-.sidebar-footer {
-    border-top: 1px solid var(--sidebar-border);
-    padding: 14px 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+.sidebar-footer { border-top: 1px solid var(--sidebar-border); padding: 14px 12px; display: flex; align-items: center; gap: 10px; }
 .sidebar-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; background: var(--sidebar-bg-hover); }
 .sidebar-user-info { overflow: hidden; }
 body.sidebar-collapsed .sidebar-user-info { display: none; }
 .sidebar-user-name { color: #fff; font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rol-badge {
-    display: inline-block;
-    margin-top: 3px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #fff;
-    text-transform: uppercase;
-}
+.rol-badge { display: inline-block; margin-top: 3px; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; color: #fff; text-transform: uppercase; }
 .rol-administrador { background-color: #19A7CE; }
 .rol-arquitecto-de-seguridad { background-color: #7C3AED; }
 .rol-custodio-de-activo { background-color: #0D9488; }
@@ -553,116 +184,219 @@ body.sidebar-collapsed .sidebar-user-info { display: none; }
 .sidebar-logout { color: #F87171; text-decoration: none; font-size: 1rem; margin-left: auto; }
 body.sidebar-collapsed .sidebar-logout { display: none; }
 
-/* ---------- Login (imagen top-left + título imagen) ---------- */
-.login-brand-corner { position: fixed; top: 20px; left: 24px; height: 36px; }
-
-/* ---------- Botón icono "refrescar" ---------- */
-.btn-icon-refresh {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    border: 1px solid var(--color-border);
+.card-riesgo {
     background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    margin-bottom: 12px;
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    cursor: pointer;
+    gap: 16px;
     box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.15s ease, transform 0.4s ease;
-    flex-shrink: 0;
 }
-.btn-icon-refresh:hover { box-shadow: var(--shadow-md); }
+.kpi-card { flex-direction: column; align-items: flex-start; }
+.kpi-card p { margin: 0; font-size: 0.75rem; color: var(--color-text-muted); text-transform: uppercase; }
+.kpi-card h3 { margin: 4px 0 0; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+
+.semaforo { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.72rem; padding: 6px 10px; border-radius: 999px; color: white; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.bg-celeste, .bg-azul, .riesgo-muy-bajo { background-color: var(--color-risk-muy-bajo); color: #ffffff; }
+.bg-verde, .riesgo-bajo { background-color: var(--color-risk-bajo); color: #ffffff; }
+.bg-amarillo, .riesgo-medio { background-color: var(--color-risk-medio); color: #ffffff; }
+.bg-naranja, .riesgo-alto { background-color: var(--color-risk-alto); color: #ffffff; }
+.bg-rojo, .riesgo-critico { background-color: var(--color-risk-critico); color: #ffffff; }
+
+.texto-secundario { font-size: 0.78em; color: #555; }
+.texto-error { color: var(--color-risk-critico) !important; }
+.texto-exito { color: var(--color-success) !important; }
+
+.tabla-riesgos-wrapper { width: 100%; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--color-border); }
+th { background-color: var(--color-bg); font-weight: 600; font-size: 0.85rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+#tabla-riesgos { table-layout: fixed; font-size: 0.85rem; }
+#tabla-riesgos th, #tabla-riesgos td { padding: 10px 12px; white-space: normal; word-wrap: break-word; vertical-align: middle; }
+#tabla-riesgos th:nth-child(1), #tabla-riesgos td:nth-child(1) { width: 15%; }
+#tabla-riesgos th:nth-child(2), #tabla-riesgos td:nth-child(2) { width: 17%; }
+#tabla-riesgos th:nth-child(3), #tabla-riesgos td:nth-child(3) { width: 8%; }
+#tabla-riesgos th:nth-child(4), #tabla-riesgos td:nth-child(4) { width: 13%; }
+#tabla-riesgos th:nth-child(5), #tabla-riesgos td:nth-child(5) { width: 15%; }
+#tabla-riesgos th:nth-child(6), #tabla-riesgos td:nth-child(6) { width: 10%; }
+#tabla-riesgos th:nth-child(7), #tabla-riesgos td:nth-child(7) { width: 12%; }
+#tabla-riesgos th:nth-child(8), #tabla-riesgos td:nth-child(8) { width: 10%; }
+
+.btn-tratar { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; background-color: var(--color-primary); color: #fff !important; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.btn-tratar:hover { background-color: var(--color-primary-hover); }
+.badge-vencido { background-color: var(--color-risk-critico); color: #fff; padding: 5px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; display: inline-block; }
+.badge-en-plazo { color: var(--color-text-muted); font-size: 0.8rem; display: inline-block; }
+
+.btn-icon-refresh { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--color-border); background-color: var(--color-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-sm); flex-shrink: 0; padding: 0; }
+.btn-icon-refresh:hover { box-shadow: var(--shadow-md); background-color: var(--color-surface); }
 .btn-icon-refresh.girando img { animation: girar 0.6s linear; }
 @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* Contenedores anchos, solo para el Dashboard */
-.page-wide { max-width: 1400px; }
-.container-wide { max-width: 1400px; }
-
-/* KPIs y gráficos: se acomodan en una fila si el ancho alcanza,
-   y solo bajan de fila si el contenedor de verdad no alcanza
-   (nunca generan scroll horizontal). */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 16px;
-}
-.charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 24px;
-}
-
-/* ---------- Tabla de riesgos del dashboard ---------- */
-.tabla-riesgos-wrapper { width: 100%; }
-.btn-tratar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 8px;
-    background-color: var(--color-primary);
-    color: #fff !important;
-    border-radius: var(--radius-sm);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-decoration: none;
-    white-space: nowrap;
-    max-width: 100%;
-    line-height: 1.1;
-}
-
-.btn-tratar:hover {
-    background-color: var(--color-primary-hover);
-}
-.btn-tratar:hover { background-color: var(--color-primary-hover); }
-.badge-vencido { background-color: var(--color-risk-critico); color: #fff; padding: 5px 5px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
-.badge-en-plazo { color: var(--color-text-muted); font-size: 0.8rem; }
-
-/* ---------- MTTM: comparación visual ---------- */
-.mttm-fila { margin-bottom: 14px; }
-.mttm-fila-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
-.mttm-barra-fondo { background: var(--color-bg); border-radius: 999px; height: 10px; overflow: hidden; }
-.mttm-barra-relleno { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
-
-/* ---------- Matriz de calor 3x3 ---------- */
 .matriz-calor { display: grid; grid-template-columns: 90px repeat(3, 1fr); gap: 4px; max-width: 480px; margin: 0 auto; }
-.matriz-celda { display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: var(--radius-sm); padding: 14px 6px; color: #fff; font-weight: 700; min-height: 64px; }
+.matriz-celda { display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); padding: 14px 6px; color: #fff; font-weight: 700; min-height: 64px; }
 .matriz-eje { font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; display: flex; align-items: center; justify-content: center; text-align: center; }
-</parameter>
 
-/* Contenedor a ancho completo, solo para la Matriz de Riesgos Detallada */
-.container-full {
-    max-width: none;
+@media (max-width: 800px) {
+    .main-content { margin-left: 0; }
+    body.sidebar-collapsed .main-content { margin-left: 0; }
+    .sidebar { position: static; width: 100%; height: auto; }
+    body.sidebar-collapsed .sidebar { width: 100%; }
+    .page { padding: 24px 16px 48px; }
+    .container { padding: 20px; }
+    fieldset { grid-template-columns: 1fr; }
+    .card-riesgo { flex-direction: column; align-items: flex-start; }
+}
+
+/* ============================================================
+   CORRECCIÓN DASHBOARD MONITOREO - ANCHO Y TABLA
+   ============================================================ */
+
+/* La página del dashboard debe usar todo el ancho disponible */
+.page.page-wide {
     width: 100%;
-}
-
-/* Tabla de riesgos: anchos de columna fijos + texto que se ajusta,
-   en vez de dejar que el contenido más largo empuje todo hacia la derecha */
-#tabla-riesgos {
-    table-layout: fixed;
-    font-size: 0.85rem;
-}
-#tabla-riesgos th, #tabla-riesgos td {
-    padding: 10px 12px;
-    white-space: normal;
-    word-wrap: break-word;
-    vertical-align: middle;
-}
-#tabla-riesgos th:nth-child(1), #tabla-riesgos td:nth-child(1) { width: 15%; } /* Activo */
-#tabla-riesgos th:nth-child(2), #tabla-riesgos td:nth-child(2) { width: 17%; } /* Amenaza/Vuln */
-#tabla-riesgos th:nth-child(3), #tabla-riesgos td:nth-child(3) { width: 8%; }  /* Nivel */
-#tabla-riesgos th:nth-child(4), #tabla-riesgos td:nth-child(4) { width: 13%; } /* VA/Prob/Riesgo */
-#tabla-riesgos th:nth-child(5), #tabla-riesgos td:nth-child(5) { width: 15%; } /* Estado */
-#tabla-riesgos th:nth-child(6), #tabla-riesgos td:nth-child(6) { width: 10%; } /* Detectado */
-#tabla-riesgos th:nth-child(7), #tabla-riesgos td:nth-child(7) { width: 12%; } /* Plazo límite */
-#tabla-riesgos th:nth-child(8), #tabla-riesgos td:nth-child(8) {
-    width: 9%;
-    text-align: center;
-} /* Acción */
-
-/* Fuerza el ancho completo de este panel específico, sin depender
-   del orden de las demás reglas en el archivo. */
-#panel-matriz-riesgos {
     max-width: none !important;
-    width: 100% !important;
+    margin: 0;
+    padding: 40px clamp(24px, 3vw, 56px) 64px;
+}
+
+/* Los recuadros blancos deben expandirse horizontalmente */
+.container.container-wide,
+#panel-matriz-riesgos {
+    width: 100%;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+/* Evita que la tabla cree scrollbar horizontal */
+.tabla-riesgos-wrapper {
+    width: 100%;
+    overflow-x: visible !important;
+}
+
+/* Tabla de matriz detallada */
+#tabla-riesgos {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+/* Celdas con salto de línea controlado */
+#tabla-riesgos th,
+#tabla-riesgos td {
+    padding: 10px 8px;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    vertical-align: top;
+    line-height: 1.25;
+}
+
+/* Encabezados más compactos */
+#tabla-riesgos th {
+    font-size: 0.72rem;
+    line-height: 1.15;
+}
+
+/* Anchos corregidos de columnas */
+#tabla-riesgos th:nth-child(1),
+#tabla-riesgos td:nth-child(1) {
+    width: 13%;
+}
+
+#tabla-riesgos th:nth-child(2),
+#tabla-riesgos td:nth-child(2) {
+    width: 23%;
+}
+
+#tabla-riesgos th:nth-child(3),
+#tabla-riesgos td:nth-child(3) {
+    width: 10%;
+    text-align: center;
+}
+
+#tabla-riesgos th:nth-child(4),
+#tabla-riesgos td:nth-child(4) {
+    width: 14%;
+}
+
+#tabla-riesgos th:nth-child(5),
+#tabla-riesgos td:nth-child(5) {
+    width: 17%;
+}
+
+#tabla-riesgos th:nth-child(6),
+#tabla-riesgos td:nth-child(6) {
+    width: 8%;
+}
+
+#tabla-riesgos th:nth-child(7),
+#tabla-riesgos td:nth-child(7) {
+    width: 9%;
+}
+
+#tabla-riesgos th:nth-child(8),
+#tabla-riesgos td:nth-child(8) {
+    width: 6%;
+    text-align: center;
+}
+
+/* Badge del nivel dentro de la tabla */
+#tabla-riesgos .semaforo,
+#tabla-riesgos .riesgo-muy-bajo,
+#tabla-riesgos .riesgo-bajo,
+#tabla-riesgos .riesgo-medio,
+#tabla-riesgos .riesgo-alto,
+#tabla-riesgos .riesgo-critico {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    max-width: 100%;
+    min-width: 72px;
+    padding: 5px 7px;
+    font-size: 0.68rem;
+    line-height: 1.1;
+    white-space: normal !important;
+    text-align: center;
+}
+
+/* Botón de acción más compacto */
+#tabla-riesgos .btn-tratar {
+    padding: 5px 7px;
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
+/* Matriz de calor también puede ocupar más espacio */
+.matriz-calor {
+    max-width: 620px;
+}
+
+/* En pantallas medianas, reducir un poco más la tabla */
+@media (max-width: 1200px) {
+    #tabla-riesgos {
+        font-size: 0.74rem;
+    }
+
+    #tabla-riesgos th,
+    #tabla-riesgos td {
+        padding: 8px 6px;
+    }
+
+    #tabla-riesgos .semaforo,
+    #tabla-riesgos .riesgo-muy-bajo,
+    #tabla-riesgos .riesgo-bajo,
+    #tabla-riesgos .riesgo-medio,
+    #tabla-riesgos .riesgo-alto,
+    #tabla-riesgos .riesgo-critico {
+        min-width: 64px;
+        font-size: 0.62rem;
+    }
 }

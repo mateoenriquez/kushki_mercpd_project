@@ -1,16 +1,31 @@
-document.addEventListener("DOMContentLoaded", () => {
+function crearCelda(texto) {
+    const td = document.createElement('td');
+    td.textContent = texto ?? '—';
+    return td;
+}
+
+function mostrarResultado(elemento, mensaje, esExito = true) {
+    if (!elemento) return;
+    elemento.classList.remove('hidden');
+    elemento.textContent = mensaje;
+    elemento.style.backgroundColor = esExito ? 'var(--color-success-bg)' : 'var(--color-danger-bg)';
+    elemento.style.color = esExito ? 'var(--color-success)' : 'var(--color-danger)';
+    elemento.style.borderColor = esExito ? 'var(--color-success)' : 'var(--color-danger)';
+}
+
+function cargarEscenarios() {
+    const select = document.getElementById('escenario_id');
+    if (!select) return;
+
     fetch('/api/escenarios/lista/')
         .then(response => response.json())
         .then(data => {
-            const select = document.getElementById('escenario_id');
-            select.innerHTML = '';
-
             const optDefault = document.createElement('option');
             optDefault.value = '';
             optDefault.disabled = true;
             optDefault.selected = true;
             optDefault.textContent = 'Seleccione un escenario...';
-            select.appendChild(optDefault);
+            select.replaceChildren(optDefault);
 
             (data.escenarios || []).forEach(e => {
                 const option = document.createElement('option');
@@ -20,58 +35,62 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         })
         .catch(error => console.error('Error al cargar escenarios:', error));
-
-    cargarComunicaciones();
-});
+}
 
 function cargarComunicaciones() {
     fetch('/api/comunicaciones/lista/')
         .then(response => response.json())
         .then(data => {
             const tbody = document.querySelector('#tabla-comunicaciones tbody');
-            tbody.innerHTML = '';
+            if (!tbody) return;
+            tbody.replaceChildren();
 
             (data.comunicaciones || []).forEach(c => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${c.fecha}</td>
-                    <td>${c.tipo === 'Observacion' ? 'Observación' : 'Recomendación'}</td>
-                    <td>${c.contenido}</td>
-                    <td>${c.usuario}</td>
-                `;
+                tr.appendChild(crearCelda(c.fecha));
+                tr.appendChild(crearCelda(c.tipo === 'Observacion' ? 'Observación' : 'Recomendación'));
+                tr.appendChild(crearCelda(c.contenido));
+                tr.appendChild(crearCelda(c.usuario));
                 tbody.appendChild(tr);
             });
         })
         .catch(error => console.error('Error al cargar comunicaciones:', error));
 }
 
-document.getElementById('form-comunicacion').addEventListener('submit', function (e) {
-    e.preventDefault();
+document.addEventListener('DOMContentLoaded', () => {
+    cargarEscenarios();
+    cargarComunicaciones();
 
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
+    const form = document.getElementById('form-comunicacion');
+    if (!form) return;
 
-    fetch('/api/comunicaciones/registrar/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': data.csrfmiddlewaretoken
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
         const div = document.getElementById('resultado-comunicacion');
-        div.classList.remove('hidden');
-        if (result.success) {
-            div.innerHTML = `<strong>Éxito:</strong> Registro guardado.`;
-            div.style.color = 'green';
-            this.reset();
-            cargarComunicaciones();
-        } else {
-            div.innerHTML = `<strong>Error:</strong> ${result.message}`;
-            div.style.color = 'red';
-        }
-    })
-    .catch(error => console.error('Error en la petición Fetch:', error));
+
+        fetch('/api/comunicaciones/registrar/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': data.csrfmiddlewaretoken,
+            },
+            body: JSON.stringify(data),
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    mostrarResultado(div, 'Éxito: Registro guardado.');
+                    form.reset();
+                    cargarComunicaciones();
+                } else {
+                    mostrarResultado(div, `Error: ${result.message || 'No se pudo registrar la comunicación.'}`, false);
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición Fetch:', error);
+                mostrarResultado(div, 'Error: No se pudo conectar con el servidor.', false);
+            });
+    });
 });

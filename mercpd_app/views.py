@@ -2,47 +2,44 @@ import csv
 import json
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from functools import wraps
 
+from django.contrib.auth.hashers import make_password, check_password
 from django.db import connection
 from django.db.models import Prefetch
-from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
-from functools import wraps
-from django.shortcuts import redirect
-from django.contrib.auth.hashers import make_password, check_password
 
 from .models import (
     Activo, Amenaza, Vulnerabilidad, EscenarioRiesgo, Usuario,
     Tratamiento, Comunicacion, AuditoriaCambio
 )
 
+
 # ============================================================
-# AUTENTICACIÓN BASADA EN SESIONES (tabla mercpd.Usuarios)
+# AUTENTICACIÓN Y AUTORIZACIÓN
 # ============================================================
 
 def login_requerido(vista_func):
-    """
-    Decorador que protege vistas de plantilla y endpoints de API.
-    Verifica que exista una sesión activa (usuario_id en session).
-    Si no la hay, redirige a /login/ (vistas HTML) o devuelve 401 (APIs).
-    """
+    """Protege vistas HTML y endpoints API mediante sesión activa."""
     @wraps(vista_func)
     def wrapper(request, *args, **kwargs):
         if not request.session.get('usuario_id'):
             if request.path.startswith('/api/'):
-                return JsonResponse({'success': False, 'message': 'Sesión no válida. Inicie sesión nuevamente.'}, status=401)
+                return JsonResponse(
+                    {'success': False, 'message': 'Sesión no válida. Inicie sesión nuevamente.'},
+                    status=401,
+                )
             return redirect(f"/login/?next={request.path}")
         return vista_func(request, *args, **kwargs)
     return wrapper
 
+
 def rol_requerido(*roles_permitidos):
-    """
-    Decorador que exige, además de sesión activa, que el rol del usuario
-    logueado esté dentro de roles_permitidos. Replica a nivel de aplicación
-    el principio de menor privilegio ya aplicado con GRANT/DENY en SQL Server.
-    """
+    """Exige sesión activa y rol autorizado para ejecutar la acción."""
     def decorador(vista_func):
         @wraps(vista_func)
         def wrapper(request, *args, **kwargs):
@@ -53,12 +50,15 @@ def rol_requerido(*roles_permitidos):
 
             if request.session.get('usuario_rol') not in roles_permitidos:
                 if request.path.startswith('/api/'):
-                    return JsonResponse({'success': False, 'message': 'No tiene permisos suficientes para esta acción.'}, status=403)
+                    return JsonResponse(
+                        {'success': False, 'message': 'No tiene permisos suficientes para esta acción.'},
+                        status=403,
+                    )
                 return render(request, 'mercpd_app/403.html', status=403)
-
             return vista_func(request, *args, **kwargs)
         return wrapper
     return decorador
+
 
 def vista_login(request):
     """Pantalla de inicio de sesión."""
@@ -79,6 +79,8 @@ def vista_login(request):
         request.session['usuario_rol'] = usuario.rol
 
         next_url = request.GET.get('next') or request.POST.get('next') or '/'
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            next_url = '/'
         return redirect(next_url)
 
     return render(request, 'mercpd_app/login.html')
@@ -89,47 +91,33 @@ def vista_logout(request):
     request.session.flush()
     return redirect('/login/')
 
+
 # ============================================================
-# REGLAS DE NEGOCIO MERC-PD
+# REGLAS DE NEGOCIO MERC-PD v2.0
 # ============================================================
 
 def calcular_valor_activo(c, i, d):
-    """
-    Regla de Negocio 1: Valor del Activo
-    Fórmula: VA = (C * 0.4) + (I * 0.35) + (D * 0.25)
-    """
+    """VA = (C * 0.40) + (I * 0.35) + (D * 0.25), con entradas 1-3."""
     va = (c * 0.4) + (i * 0.35) + (d * 0.25)
     return Decimal(str(va)).quantize(Decimal('0.001'))
 
 
 def calcular_impacto_y_riesgo(va, probabilidad, impacto_operativo, impacto_spdp, impacto_financiero):
     """
-    Reglas de Negocio 2, 3 y 4, alineadas con la metodología MERC-PD (Tarea 8):
-
-    - Factor Suelo / Piso de Criticidad (Sección 3.4, regla 1): si el activo
-      tiene VA >= 2.5 (Muy Alto/Crítico), el impacto de Protección de Datos
-      (SPDP) no puede quedar por debajo de 3 (Alto). Cualquier incidente que
-      toque un activo tan crítico arrastra automáticamente ese nivel de
-      exposición regulatoria, sin importar lo capturado por el evaluador.
-    - Impacto Base = max(Operativo, SPDP [con piso aplicado], Financiero)
-    - Impacto Final = Impacto Base * (VA / 3.0)
-    - Riesgo Total = Probabilidad * Impacto Final
-
-    Devuelve además `piso_aplicado` para informar al usuario en el frontend.
+    Calcula Impacto Base, Impacto Final y Riesgo Total.
+    Mantiene entradas 1-3 y clasifica el resultado final en 5 niveles.
     """
     va_float = float(va)
-
     impacto_spdp_efectivo = impacto_spdp
     piso_aplicado = False
+
     if va_float >= 2.5 and impacto_spdp < 3:
         impacto_spdp_efectivo = 3
         piso_aplicado = True
 
     impacto_base = max(impacto_operativo, impacto_spdp_efectivo, impacto_financiero)
-
     impacto_final = impacto_base * (va_float / 3.0)
     impacto_final_dec = Decimal(str(impacto_final)).quantize(Decimal('0.001'))
-
     riesgo_total = probabilidad * float(impacto_final_dec)
     riesgo_total_dec = Decimal(str(riesgo_total)).quantize(Decimal('0.001'))
 
@@ -144,7 +132,7 @@ def calcular_fecha_limite(riesgo_total):
     """
     riesgo_total = float(riesgo_total)
     if riesgo_total >= 7.5:
-        dias = 3
+        dias = 7
     elif riesgo_total >= 5.0:
         dias = 15
     elif riesgo_total >= 3.0:
@@ -156,11 +144,9 @@ def calcular_fecha_limite(riesgo_total):
     return timezone.now() + timedelta(days=dias)
 
 
-
 def nivel_de_riesgo(puntaje):
-    """Traduce un puntaje numérico al nivel cualitativo MERC-PD v2."""
+    """Traduce el puntaje numérico al nivel cualitativo MERC-PD v2.0."""
     puntaje = float(puntaje)
-
     if puntaje < 1.5:
         return 'Muy Bajo'
     if puntaje < 3.0:
@@ -171,12 +157,9 @@ def nivel_de_riesgo(puntaje):
         return 'Alto'
     return 'Critico'
 
+
 def registrar_auditoria(request, tabla, registro_id, accion, detalle=''):
-    """
-    Bitácora de auditoría (Extra de Fase 5). Nunca debe romper el flujo
-    principal: si falla el registro de auditoría, se ignora silenciosamente
-    y la operación original (ya confirmada) sigue su curso normal.
-    """
+    """Registra bitácora de auditoría sin interrumpir el flujo principal."""
     try:
         AuditoriaCambio.objects.create(
             tablaafectada=tabla,
@@ -190,133 +173,124 @@ def registrar_auditoria(request, tabla, registro_id, accion, detalle=''):
 
 
 # ============================================================
-# VISTAS DEL FRONTEND (RENDERIZADO DE PLANTILLAS HTML)
+# VISTAS HTML
 # ============================================================
 
 @login_requerido
 def vista_dashboard_principal(request):
-    """Renderiza la Pantalla 3: El Dashboard del Semáforo"""
     return render(request, 'mercpd_app/dashboard.html')
+
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def vista_registro_activos(request):
-    """Renderiza la Pantalla 1: Ingreso de Activos"""
     return render(request, 'mercpd_app/activos.html')
+
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def vista_identificacion_riesgos(request):
-    """Renderiza la Pantalla 2: Cruce de Amenazas y Vulnerabilidades"""
     return render(request, 'mercpd_app/identificador_riesgos.html')
+
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def vista_tratamiento_riesgo(request):
-    """Renderiza la Pantalla 4: Tratamiento del Riesgo"""
     return render(request, 'mercpd_app/tratamientos.html')
+
 
 @login_requerido
 def vista_comunicacion_reportes(request):
-    """Renderiza la Pantalla 5: Comunicación y Reportes"""
     return render(request, 'mercpd_app/comunicacion.html')
 
 
+@rol_requerido('Administrador')
+def vista_registro_usuario(request):
+    """Permite al Administrador registrar usuarios del sistema."""
+    if request.method == 'POST':
+        nombre = (request.POST.get('nombre') or '').strip()
+        email = (request.POST.get('email') or '').strip()
+        rol = (request.POST.get('rol') or '').strip()
+        password = request.POST.get('password') or ''
+
+        roles_validos = ('Administrador', 'Arquitecto de Seguridad', 'Custodio de Activo', 'Auditor')
+        if not all([nombre, email, rol, password]):
+            return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Todos los campos son obligatorios.'})
+        if rol not in roles_validos:
+            return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Rol inválido.'})
+        if Usuario.objects.filter(email=email).exists():
+            return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Ya existe un usuario con ese correo.'})
+
+        usuario = Usuario.objects.create(
+            nombre=nombre,
+            email=email,
+            rol=rol,
+            passwordhash=make_password(password),
+        )
+        registrar_auditoria(request, 'Usuarios', usuario.usuarioid, 'CREAR', f'Usuario "{nombre}" ({rol}) creado.')
+        return render(request, 'mercpd_app/registro_usuario.html', {'success': f'Usuario "{nombre}" creado exitosamente.'})
+
+    return render(request, 'mercpd_app/registro_usuario.html')
+
+
+@rol_requerido('Administrador', 'Auditor')
+def vista_auditoria(request):
+    return render(request, 'mercpd_app/auditoria.html')
+
+
 # ============================================================
-# API - PANTALLA 1: REGISTRO Y VALORACIÓN DE ACTIVOS
+# API - CATÁLOGOS Y ACTIVOS
 # ============================================================
 
 @login_requerido
 def api_activos_lista(request):
-    """
-    Devuelve el listado de activos. Si el usuario logueado es Custodio de
-    Activo, se filtra para que solo vea los activos donde él es el custodio
-    asignado (CustodioID) — esto es el "filtrado real" pedido, no solo
-    ocultar botones en el frontend.
-    """
     activos = Activo.objects.all().order_by('nombre')
-
     if request.session.get('usuario_rol') == 'Custodio de Activo':
         activos = activos.filter(custodio_id=request.session.get('usuario_id'))
-
-    data = [
-        {'id': a.activoid, 'nombre': a.nombre, 'va': float(a.valoractivo)}
-        for a in activos
-    ]
+    data = [{'id': a.activoid, 'nombre': a.nombre, 'va': float(a.valoractivo)} for a in activos]
     return JsonResponse({'activos': data})
 
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def api_usuarios_lista(request):
-    """
-    Devuelve el catálogo de usuarios registrados en el sistema, usado para
-    poblar el <select> de Custodio en la Pantalla 1 (Registro de Activos).
-    Requiere sesión activa: expone nombres y roles del personal, por lo que
-    no debe quedar público (hallazgo de seguridad corregido en Fase 4).
-    """
     usuarios = Usuario.objects.all().order_by('nombre')
-    data = [
-        {'id': u.usuarioid, 'nombre': u.nombre, 'rol': u.rol}
-        for u in usuarios
-    ]
+    data = [{'id': u.usuarioid, 'nombre': u.nombre, 'rol': u.rol} for u in usuarios]
     return JsonResponse({'usuarios': data})
 
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def api_amenazas_lista(request):
-    """
-    Devuelve el catálogo REAL de amenazas (sembrado en la Fase 1 en SQL Server),
-    usado para poblar el <select> de Amenaza en la Pantalla 2.
-    """
     amenazas = Amenaza.objects.all().order_by('tipo', 'nombre')
-    data = [
-        {'id': a.amenazaid, 'nombre': a.nombre, 'tipo': a.tipo}
-        for a in amenazas
-    ]
+    data = [{'id': a.amenazaid, 'nombre': a.nombre, 'tipo': a.tipo} for a in amenazas]
     return JsonResponse({'amenazas': data})
 
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 def api_vulnerabilidades_lista(request):
-    """
-    Devuelve el catálogo REAL de vulnerabilidades (sembrado en la Fase 1 en SQL Server),
-    usado para poblar el <select> de Vulnerabilidad en la Pantalla 2.
-    """
     vulnerabilidades = Vulnerabilidad.objects.all().order_by('tipo', 'nombre')
-    data = [
-        {'id': v.vulnerabilidadid, 'nombre': v.nombre, 'tipo': v.tipo}
-        for v in vulnerabilidades
-    ]
+    data = [{'id': v.vulnerabilidadid, 'nombre': v.nombre, 'tipo': v.tipo} for v in vulnerabilidades]
     return JsonResponse({'vulnerabilidades': data})
 
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 @require_http_methods(["POST"])
 def api_activos_registrar(request):
-    """
-    Registra un nuevo activo aplicando la Regla de Negocio 1 (Valor del Activo).
-    """
     try:
         body = json.loads(request.body)
-
         nombre = (body.get('nombre') or '').strip()
         tipo = (body.get('tipo') or '').strip()
-
         if not nombre or not tipo:
-            return JsonResponse({'success': False, 'message': 'Nombre y tipo de activo son obligatorios.'})
+            return JsonResponse({'success': False, 'message': 'Nombre y tipo de activo son obligatorios.'}, status=400)
 
         c = int(body.get('confidencialidad'))
         i = int(body.get('integridad'))
         d = int(body.get('disponibilidad'))
-
         if not all(1 <= v <= 3 for v in (c, i, d)):
-            return JsonResponse({'success': False, 'message': 'Los valores C, I, D deben estar entre 1 y 3.'})
+            return JsonResponse({'success': False, 'message': 'Los valores C, I, D deben estar entre 1 y 3.'}, status=400)
 
-        va = calcular_valor_activo(c, i, d)
-
-        # Custodio es opcional: si no se selecciona, queda en NULL
         custodio_id_raw = body.get('custodio_id')
         custodio_id = int(custodio_id_raw) if custodio_id_raw else None
         if custodio_id is not None:
-            get_object_or_404(Usuario, pk=custodio_id)  # valida que exista
+            get_object_or_404(Usuario, pk=custodio_id)
 
+        va = calcular_valor_activo(c, i, d)
         activo = Activo.objects.create(
             nombre=nombre,
             categoria=tipo,
@@ -326,38 +300,25 @@ def api_activos_registrar(request):
             valoractivo=va,
             custodio_id=custodio_id,
         )
-        
         registrar_auditoria(request, 'Activos', activo.activoid, 'CREAR', f'Activo "{nombre}" registrado (VA={va}).')
-
-        return JsonResponse({
-            'success': True,
-            'va': float(va),
-            'activo_id': activo.activoid,
-            'critico': va >= Decimal('2.5'),
-        })
-
-    except (ValueError, TypeError, KeyError):
-        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
+        return JsonResponse({'success': True, 'va': float(va), 'activo_id': activo.activoid, 'critico': va >= Decimal('2.5')})
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Formato de solicitud inválido (JSON).'}, status=400)
+    except (ValueError, TypeError, KeyError):
+        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
 
 
+# ============================================================
+# API - IDENTIFICACIÓN Y EVALUACIÓN DE RIESGOS
+# ============================================================
+
 @login_requerido
 def api_escenarios_lista(request):
-    """
-    Devuelve el listado de escenarios de riesgo ya evaluados, usado para
-    poblar el <select> de Escenario en las Pantallas 4 (Tratamiento) y
-    5 (Comunicación). Protegido con sesión: incluye puntajes de riesgo.
-    """
-    escenarios = EscenarioRiesgo.objects.select_related(
-        'activo', 'amenaza', 'vulnerabilidad'
-    ).order_by('-fechaevaluacion')
-
+    escenarios = EscenarioRiesgo.objects.select_related('activo', 'amenaza', 'vulnerabilidad').order_by('-fechaevaluacion')
     if request.session.get('usuario_rol') == 'Custodio de Activo':
         escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
-
     data = [
         {
             'id': e.escenarioid,
@@ -370,48 +331,26 @@ def api_escenarios_lista(request):
     return JsonResponse({'escenarios': data})
 
 
-# ============================================================
-# API - PANTALLA 2: IDENTIFICACIÓN DE RIESGOS
-# ============================================================
-
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 @require_http_methods(["POST"])
 def api_riesgos_evaluar(request):
-    """
-    Registra un escenario de riesgo (Amenaza x Vulnerabilidad sobre un Activo)
-    y aplica las Reglas de Negocio 2, 3 y 4 de la metodología MERC-PD,
-    incluyendo el Factor Suelo (Sección 3.4) y el cálculo de la fecha límite
-    de tratamiento (Sección 6.3).
-    """
     try:
         body = json.loads(request.body)
-
-        activo_id = int(body.get('activo_id'))
-        activo = get_object_or_404(Activo, pk=activo_id)
-
-        amenaza_id = int(body.get('amenaza_id'))
-        vulnerabilidad_id = int(body.get('vulnerabilidad_id'))
-
-        amenaza = get_object_or_404(Amenaza, pk=amenaza_id)
-        vulnerabilidad = get_object_or_404(Vulnerabilidad, pk=vulnerabilidad_id)
+        activo = get_object_or_404(Activo, pk=int(body.get('activo_id')))
+        amenaza = get_object_or_404(Amenaza, pk=int(body.get('amenaza_id')))
+        vulnerabilidad = get_object_or_404(Vulnerabilidad, pk=int(body.get('vulnerabilidad_id')))
 
         probabilidad = int(body.get('probabilidad'))
         impacto_operativo = int(body.get('impacto_operativo'))
         impacto_spdp = int(body.get('impacto_spdp'))
         impacto_financiero = int(body.get('impacto_financiero'))
 
-        campos_1_3 = (probabilidad, impacto_operativo, impacto_spdp, impacto_financiero)
-        if not all(1 <= v <= 3 for v in campos_1_3):
-            return JsonResponse({'success': False, 'message': 'Probabilidad e impactos deben estar entre 1 y 3.'})
+        if not all(1 <= v <= 3 for v in (probabilidad, impacto_operativo, impacto_spdp, impacto_financiero)):
+            return JsonResponse({'success': False, 'message': 'Probabilidad e impactos deben estar entre 1 y 3.'}, status=400)
 
         impacto_base, impacto_final_dec, riesgo_total_dec, piso_aplicado = calcular_impacto_y_riesgo(
-            va=activo.valoractivo,
-            probabilidad=probabilidad,
-            impacto_operativo=impacto_operativo,
-            impacto_spdp=impacto_spdp,
-            impacto_financiero=impacto_financiero,
+            activo.valoractivo, probabilidad, impacto_operativo, impacto_spdp, impacto_financiero
         )
-
         fecha_limite = calcular_fecha_limite(riesgo_total_dec)
 
         escenario = EscenarioRiesgo.objects.create(
@@ -427,14 +366,17 @@ def api_riesgos_evaluar(request):
             riesgototal=riesgo_total_dec,
             fechalimitetratamiento=fecha_limite,
         )
-        
-        registrar_auditoria(request, 'EscenariosRiesgo', escenario.escenarioid, 'CREAR', f'Riesgo evaluado sobre "{activo.nombre}" ({amenaza.nombre} x {vulnerabilidad.nombre}), nivel {nivel_de_riesgo(riesgo_total_dec)}.')
-
+        registrar_auditoria(
+            request,
+            'EscenariosRiesgo',
+            escenario.escenarioid,
+            'CREAR',
+            f'Riesgo evaluado sobre "{activo.nombre}" ({amenaza.nombre} x {vulnerabilidad.nombre}), nivel {nivel_de_riesgo(riesgo_total_dec)}.',
+        )
         mensaje_piso = (
-            'Se aplicó el Factor Suelo: el activo tiene VA >= 2.5, por lo que el '
-            'impacto de Protección de Datos (SPDP) se elevó automáticamente a Alto (3).'
-        ) if piso_aplicado else None
-
+            'Se aplicó el Factor Suelo: el activo tiene VA >= 2.5, por lo que el impacto SPDP se elevó automáticamente a Alto (3).'
+            if piso_aplicado else None
+        )
         return JsonResponse({
             'success': True,
             'escenario_id': escenario.escenarioid,
@@ -446,74 +388,65 @@ def api_riesgos_evaluar(request):
             'piso_aplicado': piso_aplicado,
             'mensaje_piso': mensaje_piso,
         })
-
-    except (ValueError, TypeError, KeyError):
-        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Formato de solicitud inválido (JSON).'}, status=400)
+    except (ValueError, TypeError, KeyError):
+        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
 
 
+def procesar_evaluacion_riesgo(request, escenario_id):
+    """Recalcula un escenario existente para mantenimiento interno."""
+    escenario = get_object_or_404(EscenarioRiesgo, pk=escenario_id)
+    impacto_base, impacto_final_dec, riesgo_total_dec, piso_aplicado = calcular_impacto_y_riesgo(
+        escenario.activo.valoractivo,
+        escenario.probabilidad,
+        escenario.impactooperativo,
+        escenario.impactospdp,
+        escenario.impactofinanciero,
+    )
+    escenario.impactobase = impacto_base
+    escenario.impactofinal = impacto_final_dec
+    escenario.riesgototal = riesgo_total_dec
+    if not escenario.fechalimitetratamiento:
+        escenario.fechalimitetratamiento = calcular_fecha_limite(riesgo_total_dec)
+    escenario.save()
+    return JsonResponse({
+        'status': 'success',
+        'mensaje': 'Cálculo de riesgo procesado exitosamente.',
+        'data': {
+            'impacto_base': impacto_base,
+            'impacto_final': str(impacto_final_dec),
+            'riesgo_total': str(riesgo_total_dec),
+            'piso_aplicado': piso_aplicado,
+        },
+    })
+
+
 # ============================================================
-# API - PANTALLA 3: DASHBOARD DE MONITOREO (SEMÁFORO)
+# API - DASHBOARD Y KPIs
 # ============================================================
 
 @login_requerido
 def api_dashboard_datos(request):
-    """
-    Alimenta la Matriz de Riesgos Detallada del Dashboard.
-    Devuelve todos los escenarios existentes, tratados y no tratados.
-    """
-    escenarios = EscenarioRiesgo.objects.select_related(
-        'activo', 'amenaza', 'vulnerabilidad'
-    )
-
+    escenarios = EscenarioRiesgo.objects.select_related('activo', 'amenaza', 'vulnerabilidad')
     if request.session.get('usuario_rol') == 'Custodio de Activo':
-        escenarios = escenarios.filter(
-            activo__custodio_id=request.session.get('usuario_id')
-        )
-
+        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
     escenarios = escenarios.prefetch_related(
-        Prefetch(
-            'tratamiento_set',
-            queryset=Tratamiento.objects.order_by('-fechatratamiento'),
-            to_attr='tratamientos_ordenados',
-        )
+        Prefetch('tratamiento_set', queryset=Tratamiento.objects.order_by('-fechatratamiento'), to_attr='tratamientos_ordenados')
     ).order_by('-fechaevaluacion')
 
     ahora = timezone.now()
     riesgos = []
-
     for esc in escenarios:
-        ultimo_tratamiento = (
-            esc.tratamientos_ordenados[0]
-            if esc.tratamientos_ordenados
-            else None
-        )
-
-        riesgo_actual = (
-            float(ultimo_tratamiento.riesgoresidual)
-            if ultimo_tratamiento
-            else float(esc.riesgototal)
-        )
-
-        fecha_limite = esc.fechalimitetratamiento
-        if not fecha_limite and ultimo_tratamiento:
-            fecha_limite = ultimo_tratamiento.fechalimitecierre
-
+        ultimo = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
+        riesgo_actual = float(ultimo.riesgoresidual) if ultimo else float(esc.riesgototal)
+        fecha_limite = esc.fechalimitetratamiento or (ultimo.fechalimitecierre if ultimo else None)
         vencido = False
-
         if fecha_limite:
-            if not ultimo_tratamiento:
-                vencido = fecha_limite < ahora
-            else:
-                vencido = ultimo_tratamiento.fechatratamiento > fecha_limite
-
-        dias_restantes = None
-        if not ultimo_tratamiento and fecha_limite:
-            dias_restantes = (fecha_limite - ahora).days
-
+            vencido = (ultimo.fechatratamiento > fecha_limite) if ultimo else (fecha_limite < ahora)
+        dias_restantes = (fecha_limite - ahora).days if (fecha_limite and not ultimo) else None
         riesgos.append({
             'escenario_id': esc.escenarioid,
             'activo_nombre': esc.activo.nombre,
@@ -523,196 +456,83 @@ def api_dashboard_datos(request):
             'probabilidad': esc.probabilidad,
             'impacto_final': float(esc.impactofinal),
             'riesgo_inherente': float(esc.riesgototal),
-            'estado_tratamiento': (
-                ultimo_tratamiento.opciontratamiento
-                if ultimo_tratamiento
-                else 'Sin Tratamiento'
-            ),
-            'control_aplicado': (
-                ultimo_tratamiento.controlaplicado
-                if ultimo_tratamiento
-                else None
-            ),
-            'eficacia_control': (
-                float(ultimo_tratamiento.eficaciacontrol)
-                if ultimo_tratamiento
-                else None
-            ),
+            'estado_tratamiento': ultimo.opciontratamiento if ultimo else 'Sin Tratamiento',
+            'control_aplicado': ultimo.controlaplicado if ultimo else None,
+            'eficacia_control': float(ultimo.eficaciacontrol) if ultimo else None,
             'riesgo_actual': riesgo_actual,
             'puntaje_total': riesgo_actual,
             'fecha_deteccion': esc.fechaevaluacion.strftime('%Y-%m-%d'),
-            'fecha_limite_tratamiento': (
-                fecha_limite.strftime('%Y-%m-%d')
-                if fecha_limite
-                else None
-            ),
+            'fecha_limite_tratamiento': fecha_limite.strftime('%Y-%m-%d') if fecha_limite else None,
             'dias_restantes': dias_restantes,
             'vencido': vencido,
         })
-
     return JsonResponse({'riesgos': riesgos})
 
 
 @login_requerido
 def api_dashboard_kpis(request):
-    """
-    Alimenta los gráficos del dashboard con KPIs de monitoreo.
-    Adaptado a la metodología MERC-PD v2 con 5 niveles:
-    Muy Bajo, Bajo, Medio, Alto y Crítico.
-    """
     escenarios = EscenarioRiesgo.objects.select_related('activo').prefetch_related(
-        Prefetch(
-            'tratamiento_set',
-            queryset=Tratamiento.objects.order_by('-fechatratamiento'),
-            to_attr='tratamientos_ordenados'
-        )
+        Prefetch('tratamiento_set', queryset=Tratamiento.objects.order_by('-fechatratamiento'), to_attr='tratamientos_ordenados')
     )
-
     if request.session.get('usuario_rol') == 'Custodio de Activo':
-        escenarios = escenarios.filter(
-            activo__custodio_id=request.session.get('usuario_id')
-        )
+        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
 
     ahora = timezone.now()
-
-    zonas = {
-        'Muy Bajo': 0,
-        'Bajo': 0,
-        'Medio': 0,
-        'Alto': 0,
-        'Critico': 0,
-    }
-
+    zonas = {'Muy Bajo': 0, 'Bajo': 0, 'Medio': 0, 'Alto': 0, 'Critico': 0}
     por_categoria = {}
-    criticos_totales = 0
-    criticos_sin_control = 0
-    vencidos = 0
-    en_plazo = 0
+    dias_por_nivel = {k: [] for k in zonas}
+    matriz_calor = {f'{p}-{i}': 0 for p in (1, 2, 3) for i in (1, 2, 3)}
+    criticos_totales = criticos_sin_control = vencidos = en_plazo = total = 0
     suma_riesgo = 0.0
-    total = 0
-
-    dias_por_nivel = {
-        'Muy Bajo': [],
-        'Bajo': [],
-        'Medio': [],
-        'Alto': [],
-        'Critico': [],
-    }
-
-    matriz_calor = {
-        f"{p}-{i}": 0
-        for p in (1, 2, 3)
-        for i in (1, 2, 3)
-    }
 
     for esc in escenarios:
-        clave_matriz = f"{esc.probabilidad}-{esc.impactobase}"
-        matriz_calor[clave_matriz] = matriz_calor.get(clave_matriz, 0) + 1
-
-        ultimo = (
-            esc.tratamientos_ordenados[0]
-            if esc.tratamientos_ordenados
-            else None
-        )
-
-        riesgo_actual = (
-            float(ultimo.riesgoresidual)
-            if ultimo
-            else float(esc.riesgototal)
-        )
-
+        matriz_calor[f'{esc.probabilidad}-{esc.impactobase}'] = matriz_calor.get(f'{esc.probabilidad}-{esc.impactobase}', 0) + 1
+        ultimo = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
+        riesgo_actual = float(ultimo.riesgoresidual) if ultimo else float(esc.riesgototal)
         suma_riesgo += riesgo_actual
         total += 1
-
         nivel = nivel_de_riesgo(riesgo_actual)
         zonas[nivel] += 1
-
         if nivel == 'Critico':
             criticos_totales += 1
             if not ultimo:
                 criticos_sin_control += 1
-
         categoria = esc.activo.categoria
-        por_categoria[categoria] = round(
-            por_categoria.get(categoria, 0.0) + riesgo_actual,
-            3
-        )
+        por_categoria[categoria] = round(por_categoria.get(categoria, 0.0) + riesgo_actual, 3)
 
-        fecha_limite = esc.fechalimitetratamiento
-        if not fecha_limite and ultimo:
-            fecha_limite = ultimo.fechalimitecierre
-
+        fecha_limite = esc.fechalimitetratamiento or (ultimo.fechalimitecierre if ultimo else None)
         if not ultimo and fecha_limite:
             if fecha_limite < ahora:
                 vencidos += 1
             else:
                 en_plazo += 1
-
         if ultimo:
-            dias_mitigacion = (
-                ultimo.fechatratamiento - esc.fechaevaluacion
-            ).total_seconds() / 86400
+            dias_mitigacion = (ultimo.fechatratamiento - esc.fechaevaluacion).total_seconds() / 86400
+            dias_por_nivel.setdefault(nivel_de_riesgo(esc.riesgototal), []).append(dias_mitigacion)
 
-            nivel_inherente = nivel_de_riesgo(esc.riesgototal)
-
-            if nivel_inherente not in dias_por_nivel:
-                dias_por_nivel[nivel_inherente] = []
-
-            dias_por_nivel[nivel_inherente].append(dias_mitigacion)
-
-    irrp = round(suma_riesgo / total, 3) if total else 0.0
-
-    pct_criticos_sin_control = round(
-        (criticos_sin_control / criticos_totales * 100),
-        1
-    ) if criticos_totales else 0.0
-
-    metas_mttm_dias = {
-        'Critico': 3,
-        'Alto': 15,
-        'Medio': 30,
-        'Bajo': 90,
-        'Muy Bajo': 180,
-    }
-
+    metas_mttm_dias = {'Critico': 7, 'Alto': 15, 'Medio': 30, 'Bajo': 90, 'Muy Bajo': 180}
     mttm_por_nivel = {}
     todos_los_dias = []
-
     for nivel, lista_dias in dias_por_nivel.items():
         promedio = round(sum(lista_dias) / len(lista_dias), 2) if lista_dias else None
         todos_los_dias.extend(lista_dias)
-
         meta = metas_mttm_dias.get(nivel)
-
         mttm_por_nivel[nivel] = {
             'promedio_dias': promedio,
             'meta_dias': meta,
-            'cumple_meta': (
-                promedio is not None
-                and meta is not None
-                and promedio <= meta
-            ),
+            'cumple_meta': promedio is not None and meta is not None and promedio <= meta,
             'muestras': len(lista_dias),
         }
-
-    mttm_global_dias = (
-        round(sum(todos_los_dias) / len(todos_los_dias), 2)
-        if todos_los_dias
-        else None
-    )
 
     return JsonResponse({
         'distribucion_zonas': zonas,
         'riesgo_por_categoria': por_categoria,
-        'irrp': irrp,
-        'pct_criticos_sin_control': pct_criticos_sin_control,
-        'sla': {
-            'vencidos': vencidos,
-            'en_plazo': en_plazo,
-        },
+        'irrp': round(suma_riesgo / total, 3) if total else 0.0,
+        'pct_criticos_sin_control': round((criticos_sin_control / criticos_totales * 100), 1) if criticos_totales else 0.0,
+        'sla': {'vencidos': vencidos, 'en_plazo': en_plazo},
         'matriz_calor': matriz_calor,
         'mttm': {
-            'global_dias': mttm_global_dias,
+            'global_dias': round(sum(todos_los_dias) / len(todos_los_dias), 2) if todos_los_dias else None,
             'por_nivel': mttm_por_nivel,
         },
         'total_escenarios': total,
@@ -720,130 +540,31 @@ def api_dashboard_kpis(request):
 
 
 # ============================================================
-# API - MANTENIMIENTO / RECÁLCULO PUNTUAL (uso interno / admin)
-# ============================================================
-
-@rol_requerido('Administrador')
-def vista_registro_usuario(request):
-    """
-    Pantalla de registro de nuevos usuarios del sistema.
-    Acceso exclusivo para el rol Administrador (máximo privilegio).
-    """
-    if request.method == 'POST':
-        nombre = (request.POST.get('nombre') or '').strip()
-        email = (request.POST.get('email') or '').strip()
-        rol = (request.POST.get('rol') or '').strip()
-        password = request.POST.get('password') or ''
-
-        if not all([nombre, email, rol, password]):
-            return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Todos los campos son obligatorios.'})
-
-        if rol not in ('Administrador', 'Arquitecto de Seguridad', 'Custodio de Activo', 'Auditor'):
-            return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Rol inválido.'})
-
-        if Usuario.objects.filter(email=email).exists():
-            return render(request, 'mercpd_app/registro_usuario.html', {'error': 'Ya existe un usuario con ese correo.'})
-
-        Usuario.objects.create(
-            nombre=nombre,
-            email=email,
-            rol=rol,
-            passwordhash=make_password(password),
-        )
-        registrar_auditoria(request, 'Usuarios', None, 'CREAR', f'Usuario "{nombre}" ({rol}) creado.')
-        return render(request, 'mercpd_app/registro_usuario.html', {'success': f'Usuario "{nombre}" creado exitosamente.'})
-
-    return render(request, 'mercpd_app/registro_usuario.html')
-
-def procesar_evaluacion_riesgo(request, escenario_id):
-    """
-    Recalcula y persiste Impacto Base, Impacto Final y Riesgo Total
-    para un escenario ya existente (por ejemplo, tras corregir manualmente
-    algún dato en SSMS). No es llamado por el flujo normal del frontend.
-    """
-    escenario = get_object_or_404(EscenarioRiesgo, pk=escenario_id)
-    activo = escenario.activo
-
-    impacto_base, impacto_final_dec, riesgo_total_dec, piso_aplicado = calcular_impacto_y_riesgo(
-        va=activo.valoractivo,
-        probabilidad=escenario.probabilidad,
-        impacto_operativo=escenario.impactooperativo,
-        impacto_spdp=escenario.impactospdp,
-        impacto_financiero=escenario.impactofinanciero,
-    )
-
-    escenario.impactobase = impacto_base
-    escenario.impactofinal = impacto_final_dec
-    escenario.riesgototal = riesgo_total_dec
-    if not escenario.fechalimitetratamiento:
-        escenario.fechalimitetratamiento = calcular_fecha_limite(riesgo_total_dec)
-    escenario.save()
-
-    return JsonResponse({
-        'status': 'success',
-        'mensaje': 'Cálculo de riesgo procesado exitosamente.',
-        'data': {
-            'impacto_base': impacto_base,
-            'impacto_final': str(impacto_final_dec),
-            'riesgo_total': str(riesgo_total_dec),
-            'piso_aplicado': piso_aplicado,
-        }
-    })
-
-# ============================================================
-# API - PANTALLA 4: TRATAMIENTO DEL RIESGO
+# API - TRATAMIENTO, COMUNICACIÓN, REPORTES Y AUDITORÍA
 # ============================================================
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad')
 @require_http_methods(["POST"])
 def api_tratamientos_registrar(request):
-    """
-    Registra un tratamiento de riesgo (Aspecto 3: Tratamiento del riesgo),
-    tomando como referencia las opciones de respuesta de ISO/IEC 27002:2022
-    (Mitigar, Transferir, Evitar, Aceptar).
-
-    Regla de "Priorización automática de controles" (Sección 3.4.3 y Regla
-    de aplicación 6.2 de la metodología MERC-PD): no se permite 'Aceptar'
-    un riesgo Alto/Crítico (>=5.0) ni un riesgo sobre un activo con
-    VA >= 2.5. El trigger trg_ValidarAceptacionRiesgo en SQL Server actúa
-    como respaldo si alguien intenta saltarse esta validación por fuera
-    de la aplicación.
-
-    El Riesgo Residual (Aspecto 4) lo recalcula automáticamente el trigger
-    trg_ActualizarRiesgoResidual en SQL Server justo después del INSERT;
-    aquí solo se refresca el objeto para devolver el valor ya calculado
-    por la base de datos (fuente única de verdad del cálculo).
-    """
     try:
         body = json.loads(request.body)
-
-        escenario_id = int(body.get('escenario_id'))
-        escenario = get_object_or_404(EscenarioRiesgo, pk=escenario_id)
-
+        escenario = get_object_or_404(EscenarioRiesgo, pk=int(body.get('escenario_id')))
         opcion = (body.get('opcion_tratamiento') or '').strip()
-        opciones_validas = ('Mitigar', 'Transferir', 'Evitar', 'Aceptar')
-        if opcion not in opciones_validas:
-            return JsonResponse({'success': False, 'message': f'Opción inválida. Use una de: {", ".join(opciones_validas)}.'})
+        if opcion not in ('Mitigar', 'Transferir', 'Evitar', 'Aceptar'):
+            return JsonResponse({'success': False, 'message': 'Opción de tratamiento inválida.'}, status=400)
 
-        va_activo = float(escenario.activo.valoractivo)
-        riesgo_actual = float(escenario.riesgototal)
-        if opcion == 'Aceptar' and (va_activo >= 2.5 or riesgo_actual >= 5.0):
+        if opcion == 'Aceptar' and (float(escenario.activo.valoractivo) >= 2.5 or float(escenario.riesgototal) >= 5.0):
             return JsonResponse({
                 'success': False,
-                'message': (
-                        'No se puede ACEPTAR este riesgo: es Alto/Crítico o pertenece a un activo '
-                        'con Valor >= 2.5 (metodología MERC-PD v2.0, cinco niveles). '
-                        'Seleccione Mitigar, Transferir o Evitar.'
-                ),
-            })
+                'message': 'No se puede aceptar este riesgo: es Alto/Crítico o pertenece a un activo con Valor >= 2.5.',
+            }, status=400)
 
         control = (body.get('control_aplicado') or '').strip()
         if not control:
-            return JsonResponse({'success': False, 'message': 'Debe describir el control aplicado.'})
-
+            return JsonResponse({'success': False, 'message': 'Debe describir el control aplicado.'}, status=400)
         eficacia = Decimal(str(body.get('eficacia_control')))
         if not (Decimal('0.00') <= eficacia <= Decimal('1.00')):
-            return JsonResponse({'success': False, 'message': 'La eficacia del control debe estar entre 0.00 y 1.00.'})
+            return JsonResponse({'success': False, 'message': 'La eficacia del control debe estar entre 0.00 y 1.00.'}, status=400)
 
         tratamiento = Tratamiento.objects.create(
             escenario=escenario,
@@ -852,86 +573,58 @@ def api_tratamientos_registrar(request):
             eficaciacontrol=eficacia,
             fechalimitecierre=escenario.fechalimitetratamiento,
         )
-        tratamiento.refresh_from_db()  # trae el RiesgoResidual calculado por el trigger
-        
+        tratamiento.refresh_from_db()
         registrar_auditoria(request, 'Tratamientos', tratamiento.tratamientoid, 'CREAR', f'Tratamiento "{opcion}" aplicado al escenario #{escenario.escenarioid}.')
-
-        return JsonResponse({
-            'success': True,
-            'tratamiento_id': tratamiento.tratamientoid,
-            'riesgo_residual': float(tratamiento.riesgoresidual),
-        })
-
-    except (ValueError, TypeError, KeyError, InvalidOperation):
-        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
+        return JsonResponse({'success': True, 'tratamiento_id': tratamiento.tratamientoid, 'riesgo_residual': float(tratamiento.riesgoresidual)})
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Formato de solicitud inválido (JSON).'}, status=400)
+    except (ValueError, TypeError, KeyError, InvalidOperation):
+        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
     except Exception as e:
         mensaje = str(e)
-        # El trigger trg_ValidarAceptacionRiesgo de SQL Server puede rechazar
-        # el INSERT como respaldo; se traduce a un mensaje claro para el usuario.
         if 'ACEPTAR' in mensaje.upper():
             return JsonResponse({'success': False, 'message': 'La base de datos rechazó la operación: no se puede aceptar un riesgo Alto/Crítico.'}, status=400)
         return JsonResponse({'success': False, 'message': f'Error inesperado: {mensaje}'}, status=500)
 
-
-# ============================================================
-# API - PANTALLA 5: COMUNICACIÓN, CONSULTA Y REPORTES
-# ============================================================
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad', 'Custodio de Activo')
 @require_http_methods(["POST"])
 def api_comunicaciones_registrar(request):
     try:
         body = json.loads(request.body)
-
-        escenario_id = int(body.get('escenario_id'))
-        escenario = get_object_or_404(EscenarioRiesgo, pk=escenario_id)
-
-        # Un Custodio solo puede comentar escenarios de SUS activos
-        if request.session.get('usuario_rol') == 'Custodio de Activo':
-            if escenario.activo.custodio_id != request.session.get('usuario_id'):
-                return JsonResponse({'success': False, 'message': 'Solo puede registrar comunicaciones sobre sus propios activos.'}, status=403)
-
+        escenario = get_object_or_404(EscenarioRiesgo, pk=int(body.get('escenario_id')))
+        if request.session.get('usuario_rol') == 'Custodio de Activo' and escenario.activo.custodio_id != request.session.get('usuario_id'):
+            return JsonResponse({'success': False, 'message': 'Solo puede registrar comunicaciones sobre sus propios activos.'}, status=403)
         tipo = (body.get('tipo') or '').strip()
         if tipo not in ('Observacion', 'Recomendacion'):
-            return JsonResponse({'success': False, 'message': 'Tipo inválido. Use Observacion o Recomendacion.'})
-
+            return JsonResponse({'success': False, 'message': 'Tipo inválido. Use Observacion o Recomendacion.'}, status=400)
         contenido = (body.get('contenido') or '').strip()
         if not contenido:
-            return JsonResponse({'success': False, 'message': 'El contenido no puede estar vacío.'})
-
+            return JsonResponse({'success': False, 'message': 'El contenido no puede estar vacío.'}, status=400)
         comunicacion = Comunicacion.objects.create(
             escenario=escenario,
             usuario_id=request.session.get('usuario_id'),
             tipo=tipo,
             contenido=contenido,
         )
-        
-        registrar_auditoria(request, 'Comunicaciones', comunicacion.comunicacionid, 'CREAR', f'{tipo} registrada sobre escenario #{escenario_id}.')
-
+        registrar_auditoria(request, 'Comunicaciones', comunicacion.comunicacionid, 'CREAR', f'{tipo} registrada sobre escenario #{escenario.escenarioid}.')
         return JsonResponse({'success': True, 'comunicacion_id': comunicacion.comunicacionid})
-
-    except (ValueError, TypeError, KeyError):
-        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Formato de solicitud inválido (JSON).'}, status=400)
+    except (ValueError, TypeError, KeyError):
+        return JsonResponse({'success': False, 'message': 'Datos inválidos. Verifique los campos enviados.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'}, status=500)
 
 
 @login_requerido
 def api_comunicaciones_lista(request):
-    # nota: select_related directo a activo no aplica aquí; se filtra vía escenario__activo
     comunicaciones = Comunicacion.objects.select_related('escenario__activo', 'usuario').order_by('-fechacomunicacion')
-
     if request.session.get('usuario_rol') == 'Custodio de Activo':
         comunicaciones = comunicaciones.filter(escenario__activo__custodio_id=request.session.get('usuario_id'))
-
     escenario_id = request.GET.get('escenario_id')
     if escenario_id:
         comunicaciones = comunicaciones.filter(escenario_id=escenario_id)
-
     data = [
         {
             'id': c.comunicacionid,
@@ -948,34 +641,20 @@ def api_comunicaciones_lista(request):
 
 @rol_requerido('Administrador', 'Arquitecto de Seguridad', 'Auditor')
 def api_reporte_csv(request):
-    """
-    Genera un reporte descargable (CSV) para partes interesadas, leyendo
-    directamente la vista consolidada mercpd.vw_DashboardRiesgos creada
-    en la Fase 1 (Aspecto 5: opción de generar reportes).
-    """
     with connection.cursor() as cursor:
-        cursor.execute("SELECT * FROM mercpd.vw_DashboardRiesgos ORDER BY RiesgoActual DESC")
+        cursor.execute('SELECT * FROM mercpd.vw_DashboardRiesgos ORDER BY RiesgoActual DESC')
         columnas = [col[0] for col in cursor.description]
         filas = cursor.fetchall()
-
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="reporte_riesgos_kushki.csv"'
-
     writer = csv.writer(response)
     writer.writerow(columnas)
     writer.writerows(filas)
-
     return response
-
-@rol_requerido('Administrador', 'Auditor')
-def vista_auditoria(request):
-    """Renderiza la Bitácora de Auditoría (Extra de Fase 5)."""
-    return render(request, 'mercpd_app/auditoria.html')
 
 
 @rol_requerido('Administrador', 'Auditor')
 def api_auditoria_lista(request):
-    """Devuelve las últimas 200 acciones registradas en el sistema."""
     registros = AuditoriaCambio.objects.select_related('usuario').order_by('-fechaaccion')[:200]
     data = [
         {
