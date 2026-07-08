@@ -435,7 +435,7 @@ body.sidebar-collapsed .main-content {
     flex-direction: column;
     transition: width 0.25s ease;
     z-index: 100;
-    overflow: hidden;
+    overflow: visible;
 }
 body.sidebar-collapsed .sidebar { width: var(--sidebar-width-collapsed); }
 
@@ -554,18 +554,18 @@ body.sidebar-collapsed .sidebar-logout { display: none; }
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    border: none;
-    background-color: var(--color-primary);
-    color: #fff;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background-color 0.15s ease, transform 0.4s ease;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.15s ease, transform 0.4s ease;
     flex-shrink: 0;
 }
-.btn-icon-refresh:hover { background-color: var(--color-primary-hover); }
-.btn-icon-refresh.girando svg { animation: girar 0.6s linear; }
+.btn-icon-refresh:hover { box-shadow: var(--shadow-md); }
+.btn-icon-refresh.girando img { animation: girar 0.6s linear; }
 @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 /* Contenedores anchos, solo para el Dashboard */
@@ -587,27 +587,7 @@ body.sidebar-collapsed .sidebar-logout { display: none; }
 }
 
 /* ---------- Tabla de riesgos del dashboard ---------- */
-.tabla-riesgos-wrapper { 
-    width: 100%; 
-    overflow-x: auto; 
-    margin-top: 15px;
-}
-.tabla-riesgos-wrapper table { 
-    width: 100%; 
-    min-width: 1100px; /* Esto evita que se aplaste */
-    border-collapse: collapse; 
-}
-.tabla-riesgos-wrapper th, 
-.tabla-riesgos-wrapper td {
-    padding: 14px 18px; /* Esto le da respiro al texto */
-    text-align: left;
-    vertical-align: middle;
-    border-bottom: 1px solid var(--color-border);
-}
-.tabla-riesgos-wrapper th {
-    white-space: nowrap; /* Evita que los títulos bajen a la siguiente línea */
-    background-color: var(--color-bg); 
-}
+.tabla-riesgos-wrapper { width: 100%; }
 .btn-tratar {
     display: inline-block;
     padding: 7px 14px;
@@ -620,7 +600,7 @@ body.sidebar-collapsed .sidebar-logout { display: none; }
     white-space: nowrap;
 }
 .btn-tratar:hover { background-color: var(--color-primary-hover); }
-.badge-vencido { background-color: var(--color-risk-critico); color: #fff; padding: 3px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.badge-vencido { background-color: var(--color-risk-critico); color: #fff; padding: 5px 5px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
 .badge-en-plazo { color: var(--color-text-muted); font-size: 0.8rem; }
 
 /* ---------- MTTM: comparación visual ---------- */
@@ -634,3 +614,37 @@ body.sidebar-collapsed .sidebar-logout { display: none; }
 .matriz-celda { display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: var(--radius-sm); padding: 14px 6px; color: #fff; font-weight: 700; min-height: 64px; }
 .matriz-eje { font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; display: flex; align-items: center; justify-content: center; text-align: center; }
 </parameter>
+
+/* Contenedor a ancho completo, solo para la Matriz de Riesgos Detallada */
+.container-full {
+    max-width: none;
+    width: 100%;
+}
+
+/* Tabla de riesgos: anchos de columna fijos + texto que se ajusta,
+   en vez de dejar que el contenido más largo empuje todo hacia la derecha */
+#tabla-riesgos {
+    table-layout: fixed;
+    font-size: 0.85rem;
+}
+#tabla-riesgos th, #tabla-riesgos td {
+    padding: 10px 12px;
+    white-space: normal;
+    word-wrap: break-word;
+    vertical-align: middle;
+}
+#tabla-riesgos th:nth-child(1), #tabla-riesgos td:nth-child(1) { width: 15%; } /* Activo */
+#tabla-riesgos th:nth-child(2), #tabla-riesgos td:nth-child(2) { width: 17%; } /* Amenaza/Vuln */
+#tabla-riesgos th:nth-child(3), #tabla-riesgos td:nth-child(3) { width: 8%; }  /* Nivel */
+#tabla-riesgos th:nth-child(4), #tabla-riesgos td:nth-child(4) { width: 13%; } /* VA/Prob/Riesgo */
+#tabla-riesgos th:nth-child(5), #tabla-riesgos td:nth-child(5) { width: 15%; } /* Estado */
+#tabla-riesgos th:nth-child(6), #tabla-riesgos td:nth-child(6) { width: 10%; } /* Detectado */
+#tabla-riesgos th:nth-child(7), #tabla-riesgos td:nth-child(7) { width: 12%; } /* Plazo límite */
+#tabla-riesgos th:nth-child(8), #tabla-riesgos td:nth-child(8) { width: 10%; text-align:center; } /* Acción */
+
+/* Fuerza el ancho completo de este panel específico, sin depender
+   del orden de las demás reglas en el archivo. */
+#panel-matriz-riesgos {
+    max-width: none !important;
+    width: 100% !important;
+}
