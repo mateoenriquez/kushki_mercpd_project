@@ -138,32 +138,38 @@ def calcular_impacto_y_riesgo(va, probabilidad, impacto_operativo, impacto_spdp,
 
 def calcular_fecha_limite(riesgo_total):
     """
-    Tiempos de respuesta obligatorios por nivel (Sección 6.3 de la
-    metodología): Bajo -> 90 días, Medio -> 30 días, Alto -> 15 días,
-    Crítico -> 7 días (corrección definitiva tras la contención de 0-24h).
+    MERC-PD v2.0 - cinco niveles:
+    Muy Bajo -> 180 días, Bajo -> 90 días, Medio -> 30 días,
+    Alto -> 15 días, Crítico -> 7 días.
     """
     riesgo_total = float(riesgo_total)
     if riesgo_total >= 7.5:
-        dias = 7
+        dias = 3
     elif riesgo_total >= 5.0:
         dias = 15
     elif riesgo_total >= 3.0:
         dias = 30
-    else:
+    elif riesgo_total >= 1.5:
         dias = 90
+    else:
+        dias = 180
     return timezone.now() + timedelta(days=dias)
 
 
+
 def nivel_de_riesgo(puntaje):
-    """Traduce un puntaje numérico al nivel cualitativo (Sección 6.2)."""
+    """Traduce un puntaje numérico al nivel cualitativo MERC-PD v2."""
     puntaje = float(puntaje)
-    if puntaje >= 7.5:
-        return 'Critico'
-    if puntaje >= 5.0:
-        return 'Alto'
-    if puntaje >= 3.0:
+
+    if puntaje < 1.5:
+        return 'Muy Bajo'
+    if puntaje < 3.0:
+        return 'Bajo'
+    if puntaje < 5.0:
         return 'Medio'
-    return 'Bajo'
+    if puntaje < 7.5:
+        return 'Alto'
+    return 'Critico'
 
 def registrar_auditoria(request, tabla, registro_id, accion, detalle=''):
     """
@@ -456,16 +462,17 @@ def api_riesgos_evaluar(request):
 @login_requerido
 def api_dashboard_datos(request):
     """
-    Alimenta el Dashboard. Si el usuario es Custodio de Activo, el semáforo
-    se limita a sus propios activos (filtrado real, no visual). Incluye
-    fecha de detección, fecha límite y estado de SLA (Sección 6.3).
+    Alimenta la Matriz de Riesgos Detallada del Dashboard.
+    Devuelve todos los escenarios existentes, tratados y no tratados.
     """
     escenarios = EscenarioRiesgo.objects.select_related(
         'activo', 'amenaza', 'vulnerabilidad'
     )
 
     if request.session.get('usuario_rol') == 'Custodio de Activo':
-        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
+        escenarios = escenarios.filter(
+            activo__custodio_id=request.session.get('usuario_id')
+        )
 
     escenarios = escenarios.prefetch_related(
         Prefetch(
@@ -477,36 +484,71 @@ def api_dashboard_datos(request):
 
     ahora = timezone.now()
     riesgos = []
+
     for esc in escenarios:
-        ultimo_tratamiento = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
-        riesgo_actual = float(ultimo_tratamiento.riesgoresidual) if ultimo_tratamiento else float(esc.riesgototal)
-
-        vencido = bool(
-            not ultimo_tratamiento and esc.fechalimitetratamiento and esc.fechalimitetratamiento < ahora
+        ultimo_tratamiento = (
+            esc.tratamientos_ordenados[0]
+            if esc.tratamientos_ordenados
+            else None
         )
-        dias_restantes = None
-        if not ultimo_tratamiento and esc.fechalimitetratamiento:
-            dias_restantes = (esc.fechalimitetratamiento - ahora).days
 
-            riesgos.append({
-                'escenario_id': esc.escenarioid,
-                'activo_nombre': esc.activo.nombre,
-                'amenaza': esc.amenaza.nombre,
-                'vulnerabilidad': esc.vulnerabilidad.nombre,
-                'va': float(esc.activo.valoractivo),
-                'probabilidad': esc.probabilidad,
-                'impacto_final': float(esc.impactofinal),
-                'riesgo_inherente': float(esc.riesgototal),
-                'estado_tratamiento': ultimo_tratamiento.opciontratamiento if ultimo_tratamiento else 'Sin Tratamiento',
-                'control_aplicado': ultimo_tratamiento.controlaplicado if ultimo_tratamiento else None,
-                'eficacia_control': float(ultimo_tratamiento.eficaciacontrol) if ultimo_tratamiento else None,
-                'riesgo_actual': riesgo_actual,
-                'puntaje_total': riesgo_actual,
-                'fecha_deteccion': esc.fechaevaluacion.strftime('%Y-%m-%d'),
-                'fecha_limite_tratamiento': esc.fechalimitetratamiento.strftime('%Y-%m-%d') if esc.fechalimitetratamiento else None,
-                'dias_restantes': dias_restantes,
-                'vencido': vencido,
-            })
+        riesgo_actual = (
+            float(ultimo_tratamiento.riesgoresidual)
+            if ultimo_tratamiento
+            else float(esc.riesgototal)
+        )
+
+        fecha_limite = esc.fechalimitetratamiento
+        if not fecha_limite and ultimo_tratamiento:
+            fecha_limite = ultimo_tratamiento.fechalimitecierre
+
+        vencido = False
+
+        if fecha_limite:
+            if not ultimo_tratamiento:
+                vencido = fecha_limite < ahora
+            else:
+                vencido = ultimo_tratamiento.fechatratamiento > fecha_limite
+
+        dias_restantes = None
+        if not ultimo_tratamiento and fecha_limite:
+            dias_restantes = (fecha_limite - ahora).days
+
+        riesgos.append({
+            'escenario_id': esc.escenarioid,
+            'activo_nombre': esc.activo.nombre,
+            'amenaza': esc.amenaza.nombre,
+            'vulnerabilidad': esc.vulnerabilidad.nombre,
+            'va': float(esc.activo.valoractivo),
+            'probabilidad': esc.probabilidad,
+            'impacto_final': float(esc.impactofinal),
+            'riesgo_inherente': float(esc.riesgototal),
+            'estado_tratamiento': (
+                ultimo_tratamiento.opciontratamiento
+                if ultimo_tratamiento
+                else 'Sin Tratamiento'
+            ),
+            'control_aplicado': (
+                ultimo_tratamiento.controlaplicado
+                if ultimo_tratamiento
+                else None
+            ),
+            'eficacia_control': (
+                float(ultimo_tratamiento.eficaciacontrol)
+                if ultimo_tratamiento
+                else None
+            ),
+            'riesgo_actual': riesgo_actual,
+            'puntaje_total': riesgo_actual,
+            'fecha_deteccion': esc.fechaevaluacion.strftime('%Y-%m-%d'),
+            'fecha_limite_tratamiento': (
+                fecha_limite.strftime('%Y-%m-%d')
+                if fecha_limite
+                else None
+            ),
+            'dias_restantes': dias_restantes,
+            'vencido': vencido,
+        })
 
     return JsonResponse({'riesgos': riesgos})
 
@@ -514,22 +556,33 @@ def api_dashboard_datos(request):
 @login_requerido
 def api_dashboard_kpis(request):
     """
-    Alimenta los gráficos del dashboard con los KPIs de monitoreo continuo
-    de la metodología MERC-PD (Sección 7.3): distribución de riesgos por
-    zona del semáforo, riesgo acumulado por categoría de activo, Índice de
-    Riesgo Residual Promedio (IRRP), % de riesgos críticos sin control,
-    cumplimiento de SLA (escenarios vencidos vs. en plazo) y Tiempo Medio
-    de Mitigación (MTTM) comparado contra las metas de la metodología.
+    Alimenta los gráficos del dashboard con KPIs de monitoreo.
+    Adaptado a la metodología MERC-PD v2 con 5 niveles:
+    Muy Bajo, Bajo, Medio, Alto y Crítico.
     """
     escenarios = EscenarioRiesgo.objects.select_related('activo').prefetch_related(
-        Prefetch('tratamiento_set', queryset=Tratamiento.objects.order_by('-fechatratamiento'), to_attr='tratamientos_ordenados')
+        Prefetch(
+            'tratamiento_set',
+            queryset=Tratamiento.objects.order_by('-fechatratamiento'),
+            to_attr='tratamientos_ordenados'
+        )
     )
 
     if request.session.get('usuario_rol') == 'Custodio de Activo':
-        escenarios = escenarios.filter(activo__custodio_id=request.session.get('usuario_id'))
+        escenarios = escenarios.filter(
+            activo__custodio_id=request.session.get('usuario_id')
+        )
 
     ahora = timezone.now()
-    zonas = {'Bajo': 0, 'Medio': 0, 'Alto': 0, 'Critico': 0}
+
+    zonas = {
+        'Muy Bajo': 0,
+        'Bajo': 0,
+        'Medio': 0,
+        'Alto': 0,
+        'Critico': 0,
+    }
+
     por_categoria = {}
     criticos_totales = 0
     criticos_sin_control = 0
@@ -538,74 +591,125 @@ def api_dashboard_kpis(request):
     suma_riesgo = 0.0
     total = 0
 
-    # MTTM (Tiempo Medio de Mitigación) - Sección 7.3 de la metodología.
-    # Se agrupa por el nivel de riesgo INHERENTE (el detectado al momento
-    # de la evaluación), porque las metas de tiempo de respuesta de la
-    # Sección 6.3 / 7.3 se definen sobre ese nivel, no sobre el residual.
-    dias_por_nivel = {'Bajo': [], 'Medio': [], 'Alto': [], 'Critico': []}
+    dias_por_nivel = {
+        'Muy Bajo': [],
+        'Bajo': [],
+        'Medio': [],
+        'Alto': [],
+        'Critico': [],
+    }
 
-    matriz_calor = {f"{p}-{i}": 0 for p in (1, 2, 3) for i in (1, 2, 3)}
-    
+    matriz_calor = {
+        f"{p}-{i}": 0
+        for p in (1, 2, 3)
+        for i in (1, 2, 3)
+    }
+
     for esc in escenarios:
         clave_matriz = f"{esc.probabilidad}-{esc.impactobase}"
         matriz_calor[clave_matriz] = matriz_calor.get(clave_matriz, 0) + 1
-        ultimo = esc.tratamientos_ordenados[0] if esc.tratamientos_ordenados else None
-        riesgo_actual = float(ultimo.riesgoresidual) if ultimo else float(esc.riesgototal)
+
+        ultimo = (
+            esc.tratamientos_ordenados[0]
+            if esc.tratamientos_ordenados
+            else None
+        )
+
+        riesgo_actual = (
+            float(ultimo.riesgoresidual)
+            if ultimo
+            else float(esc.riesgototal)
+        )
+
         suma_riesgo += riesgo_actual
         total += 1
 
         nivel = nivel_de_riesgo(riesgo_actual)
         zonas[nivel] += 1
+
         if nivel == 'Critico':
             criticos_totales += 1
             if not ultimo:
                 criticos_sin_control += 1
 
-        cat = esc.activo.categoria
-        por_categoria[cat] = round(por_categoria.get(cat, 0.0) + riesgo_actual, 3)
+        categoria = esc.activo.categoria
+        por_categoria[categoria] = round(
+            por_categoria.get(categoria, 0.0) + riesgo_actual,
+            3
+        )
 
-        if not ultimo and esc.fechalimitetratamiento:
-            if esc.fechalimitetratamiento < ahora:
+        fecha_limite = esc.fechalimitetratamiento
+        if not fecha_limite and ultimo:
+            fecha_limite = ultimo.fechalimitecierre
+
+        if not ultimo and fecha_limite:
+            if fecha_limite < ahora:
                 vencidos += 1
             else:
                 en_plazo += 1
 
-        # Un escenario aporta al MTTM solo si YA fue tratado (tiene fecha
-        # de cierre). Se mide desde la detección (FechaEvaluacion) hasta
-        # el registro del tratamiento (FechaTratamiento).
         if ultimo:
-            dias_mitigacion = (ultimo.fechatratamiento - esc.fechaevaluacion).total_seconds() / 86400
+            dias_mitigacion = (
+                ultimo.fechatratamiento - esc.fechaevaluacion
+            ).total_seconds() / 86400
+
             nivel_inherente = nivel_de_riesgo(esc.riesgototal)
+
+            if nivel_inherente not in dias_por_nivel:
+                dias_por_nivel[nivel_inherente] = []
+
             dias_por_nivel[nivel_inherente].append(dias_mitigacion)
 
     irrp = round(suma_riesgo / total, 3) if total else 0.0
-    pct_criticos_sin_control = round((criticos_sin_control / criticos_totales * 100), 1) if criticos_totales else 0.0
 
-    # Metas de MTTM por nivel (Sección 6.3 / 7.3 de la metodología MERC-PD).
-    # Crítico: 72 horas = 3 días de corrección definitiva.
-    metas_mttm_dias = {'Critico': 3, 'Alto': 15, 'Medio': 30}
+    pct_criticos_sin_control = round(
+        (criticos_sin_control / criticos_totales * 100),
+        1
+    ) if criticos_totales else 0.0
+
+    metas_mttm_dias = {
+        'Critico': 3,
+        'Alto': 15,
+        'Medio': 30,
+        'Bajo': 90,
+        'Muy Bajo': 180,
+    }
 
     mttm_por_nivel = {}
     todos_los_dias = []
+
     for nivel, lista_dias in dias_por_nivel.items():
         promedio = round(sum(lista_dias) / len(lista_dias), 2) if lista_dias else None
         todos_los_dias.extend(lista_dias)
+
         meta = metas_mttm_dias.get(nivel)
+
         mttm_por_nivel[nivel] = {
             'promedio_dias': promedio,
             'meta_dias': meta,
-            'cumple_meta': (promedio is not None and meta is not None and promedio <= meta),
+            'cumple_meta': (
+                promedio is not None
+                and meta is not None
+                and promedio <= meta
+            ),
             'muestras': len(lista_dias),
         }
 
-    mttm_global_dias = round(sum(todos_los_dias) / len(todos_los_dias), 2) if todos_los_dias else None
+    mttm_global_dias = (
+        round(sum(todos_los_dias) / len(todos_los_dias), 2)
+        if todos_los_dias
+        else None
+    )
 
     return JsonResponse({
         'distribucion_zonas': zonas,
         'riesgo_por_categoria': por_categoria,
         'irrp': irrp,
         'pct_criticos_sin_control': pct_criticos_sin_control,
-        'sla': {'vencidos': vencidos, 'en_plazo': en_plazo},
+        'sla': {
+            'vencidos': vencidos,
+            'en_plazo': en_plazo,
+        },
         'matriz_calor': matriz_calor,
         'mttm': {
             'global_dias': mttm_global_dias,
@@ -727,9 +831,9 @@ def api_tratamientos_registrar(request):
             return JsonResponse({
                 'success': False,
                 'message': (
-                    'No se puede ACEPTAR este riesgo: es Alto/Crítico o pertenece a un activo '
-                    'con Valor >= 2.5 (metodología MERC-PD, Secciones 3.4.3 y 6.2). '
-                    'Seleccione Mitigar, Transferir o Evitar.'
+                        'No se puede ACEPTAR este riesgo: es Alto/Crítico o pertenece a un activo '
+                        'con Valor >= 2.5 (metodología MERC-PD v2.0, cinco niveles). '
+                        'Seleccione Mitigar, Transferir o Evitar.'
                 ),
             })
 

@@ -387,7 +387,8 @@ th {
     --color-primary-hover: #0B2447;
     --color-primary-soft: #E6F6FB;
 
-    /* Paleta de riesgo con 4 niveles bien diferenciados */
+    /* Paleta de riesgo con 5 niveles bien diferenciados */
+    --color-risk-muy-bajo: #0EA5E9;
     --color-risk-bajo: #16A34A;
     --color-risk-medio: #F59E0B;
     --color-risk-alto: #EA580C;
@@ -403,11 +404,17 @@ th {
 }
 
 /* Semáforo con 4 colores distintos: Medio y Alto ya NO se confunden */
+.bg-azul { background-color: var(--color-risk-muy-bajo); color: #ffffff; }
 .bg-verde { background-color: var(--color-risk-bajo); }
 .bg-amarillo { background-color: var(--color-risk-medio); color: #ffffff; }
 .bg-naranja { background-color: var(--color-risk-alto); color: #ffffff; }
 .bg-rojo { background-color: var(--color-risk-critico); }
+.bg-celeste {
+    background-color: #0EA5E9;
+    color: #ffffff;
+}
 
+.riesgo-muy-bajo { background-color: var(--color-risk-muy-bajo); color: #ffffff; }
 .riesgo-bajo { background-color: var(--color-risk-bajo); }
 .riesgo-medio { background-color: var(--color-risk-medio); color: #ffffff; }
 .riesgo-alto { background-color: var(--color-risk-alto); color: #ffffff; }
@@ -589,15 +596,23 @@ body.sidebar-collapsed .sidebar-logout { display: none; }
 /* ---------- Tabla de riesgos del dashboard ---------- */
 .tabla-riesgos-wrapper { width: 100%; }
 .btn-tratar {
-    display: inline-block;
-    padding: 7px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
     background-color: var(--color-primary);
     color: #fff !important;
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
+    max-width: 100%;
+    line-height: 1.1;
+}
+
+.btn-tratar:hover {
+    background-color: var(--color-primary-hover);
 }
 .btn-tratar:hover { background-color: var(--color-primary-hover); }
 .badge-vencido { background-color: var(--color-risk-critico); color: #fff; padding: 5px 5px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
@@ -640,7 +655,10 @@ body.sidebar-collapsed .sidebar-logout { display: none; }
 #tabla-riesgos th:nth-child(5), #tabla-riesgos td:nth-child(5) { width: 15%; } /* Estado */
 #tabla-riesgos th:nth-child(6), #tabla-riesgos td:nth-child(6) { width: 10%; } /* Detectado */
 #tabla-riesgos th:nth-child(7), #tabla-riesgos td:nth-child(7) { width: 12%; } /* Plazo límite */
-#tabla-riesgos th:nth-child(8), #tabla-riesgos td:nth-child(8) { width: 10%; text-align:center; } /* Acción */
+#tabla-riesgos th:nth-child(8), #tabla-riesgos td:nth-child(8) {
+    width: 9%;
+    text-align: center;
+} /* Acción */
 
 /* Fuerza el ancho completo de este panel específico, sin depender
    del orden de las demás reglas en el archivo. */
