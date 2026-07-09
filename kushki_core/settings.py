@@ -23,7 +23,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
         'DJANGO_CSRF_TRUSTED_ORIGINS',
-        'http://localhost:8080,http://127.0.0.1:8080,https://*.trycloudflare.com'
+        'http://localhost:8080,http://127.0.0.1:8080,https://*.trycloudflare.com,https://*.ngrok-free.app,https://*.ngrok.app,https://*.ngrok-free.com,https://*.ngrok-free.dev'
     ).split(',')
     if origin.strip()
 ]
@@ -105,3 +105,5 @@ X_FRAME_OPTIONS = 'DENY'
 # Cabeceras seguras recomendadas para despliegue HTTPS.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

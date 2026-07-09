@@ -5,8 +5,8 @@ cd /d "D:\UDLA\S_Proyectos\S6_Proyectos\S.Informática\kushki_mercpd_project"
 
 set DJANGO_SECRET_KEY=argos-mercpd-demo-2026-seguridad
 set DJANGO_DEBUG=False
-set DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.trycloudflare.com
-set DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,https://*.trycloudflare.com
+set DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.trycloudflare.com,.ngrok-free.app,.ngrok.app,.ngrok-free.com,.ngrok-free.dev,unedited-subside-pregnant.ngrok-free.dev
+set DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,https://*.trycloudflare.com,https://*.ngrok-free.app,https://*.ngrok.app,https://*.ngrok-free.com,https://*.ngrok-free.dev,https://unedited-subside-pregnant.ngrok-free.dev
 set DJANGO_DB_NAME=Kushki_MERCPD
 set DJANGO_DB_HOST=.
 set DJANGO_DB_DRIVER=ODBC Driver 17 for SQL Server
